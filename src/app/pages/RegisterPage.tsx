@@ -21,7 +21,6 @@ export function RegisterPage() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [authError, setAuthError] = useState('');
-  const [registered, setRegistered] = useState(false);
 
   const validateEmail = (val: string) =>
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
@@ -64,7 +63,7 @@ export function RegisterPage() {
       password,
       options: {
         data: { full_name: fullName.trim() },
-        emailRedirectTo: `${window.location.origin}/dashboard`,
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
       },
     });
     setIsLoading(false);
@@ -76,13 +75,13 @@ export function RegisterPage() {
       return;
     }
 
-    setRegistered(true);
+    navigate('/verify-email', { state: { email } });
   };
 
   const handleGoogleSignUp = async () => {
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/dashboard` },
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
     });
   };
 
@@ -275,18 +274,11 @@ export function RegisterPage() {
                 </p>
               )}
 
-              {/* Sukses registrasi */}
-              {registered && (
-                <div className="rounded-lg bg-green-500/20 border border-green-400/30 px-4 py-3 text-green-300 text-sm leading-relaxed">
-                  Akun berhasil dibuat! Cek email Anda untuk verifikasi sebelum login.
-                </div>
-              )}
-
               {/* Create Account Button */}
               <div className="pt-2">
                 <button
                   type="submit"
-                  disabled={isLoading || registered}
+                  disabled={isLoading}
                   className="w-full bg-[#3b82f6] hover:bg-[#2563eb] disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold uppercase tracking-wide py-3.5 rounded-lg transition-colors shadow-lg text-sm"
                 >
                   {isLoading ? 'Membuat Akun...' : 'BUAT AKUN'}

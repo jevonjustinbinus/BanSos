@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { BroadcastAlert } from './AdminBroadcastAlert';
 import { VerifyReports } from './AdminVerifyReports';
-import { AdminOverview, CommunityReport, fetchAdminOverview, fetchReports } from '../services/api';
+import { AdminOverview, CommunityReport, fetchAdminOverview, fetchReports, updateReportStatus } from '../services/api';
 
 const severityColor: Record<string, string> = {
   KRITIS: 'bg-[#93000a] text-[#ffdad6]',
@@ -142,59 +142,133 @@ function Overview() {
   );
 }
 
-const statusOptions = ['Aktif', 'Dalam Penanganan', 'Selesai', 'Dibatalkan'];
-const statusColor: Record<string, string> = {
-  Aktif: 'text-[#ef4444] bg-[rgba(239,68,68,0.1)] border-[rgba(239,68,68,0.25)]',
-  'Dalam Penanganan': 'text-[#ffb786] bg-[rgba(255,183,134,0.1)] border-[rgba(255,183,134,0.25)]',
-  Selesai: 'text-[#22c55e] bg-[rgba(34,197,94,0.1)] border-[rgba(34,197,94,0.25)]',
-  Dibatalkan: 'text-[#8c909f] bg-[rgba(140,144,159,0.1)] border-[rgba(140,144,159,0.2)]',
+const riskStatusOptions = [
+  { value: 'pending', label: 'Menunggu' },
+  { value: 'need_review', label: 'Perlu Ditinjau' },
+  { value: 'approved', label: 'Terverifikasi' },
+  { value: 'resolved', label: 'Selesai' },
+  { value: 'rejected', label: 'Ditolak' },
+];
+
+const riskStatusColor: Record<string, string> = {
+  pending: 'text-[#ffb786] bg-[rgba(255,183,134,0.1)] border-[rgba(255,183,134,0.25)]',
+  need_review: 'text-[#adc6ff] bg-[rgba(173,198,255,0.1)] border-[rgba(173,198,255,0.25)]',
+  approved: 'text-[#22c55e] bg-[rgba(34,197,94,0.1)] border-[rgba(34,197,94,0.25)]',
+  resolved: 'text-[#22c55e] bg-[rgba(34,197,94,0.1)] border-[rgba(34,197,94,0.25)]',
+  rejected: 'text-[#8c909f] bg-[rgba(140,144,159,0.1)] border-[rgba(140,144,159,0.2)]',
+  duplicate: 'text-[#8c909f] bg-[rgba(140,144,159,0.1)] border-[rgba(140,144,159,0.2)]',
 };
 
-function RiskControl() {
-  const [incidents, setIncidents] = useState([
-    { id: 'RISK-001', title: 'Banjir Kemang', severity: 'KRITIS', status: 'Aktif', freshness: '5 menit lalu' },
-    { id: 'RISK-002', title: 'Pohon Tumbang Kebon Jeruk', severity: 'SEDANG', status: 'Dalam Penanganan', freshness: '22 menit lalu' },
-    { id: 'RISK-003', title: 'Genangan Cilandak', severity: 'RENDAH', status: 'Selesai', freshness: '2 jam lalu' },
-    { id: 'RISK-005', title: 'Tanggul Bocor Manggarai', severity: 'KRITIS', status: 'Aktif', freshness: '9 menit lalu' },
-  ]);
+function timeAgo(iso?: string) {
+  if (!iso) return '-';
+  const mins = Math.max(0, (Date.now() - new Date(iso).getTime()) / 60000);
+  if (mins < 1) return 'baru saja';
+  if (mins < 60) return `${Math.floor(mins)} menit lalu`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} jam lalu`;
+  return `${Math.floor(hours / 24)} hari lalu`;
+}
 
-  const changeStatus = (id: string, s: string) =>
-    setIncidents((prev) => prev.map((i) => (i.id === id ? { ...i, status: s } : i)));
+function RiskControl() {
+  const [reports, setReports] = useState<CommunityReport[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [savingId, setSavingId] = useState<string | null>(null);
+
+  const load = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const result = await fetchReports();
+      setReports(result.data || []);
+    } catch (err) {
+      console.error(err);
+      setError('Gagal mengambil data laporan dari backend.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const changeStatus = async (id: string, newStatus: string) => {
+    setSavingId(id);
+    try {
+      await updateReportStatus(id, newStatus);
+      setReports((prev) => prev.map((r) => r.id === id ? { ...r, status: newStatus } : r));
+    } catch (err) {
+      console.error(err);
+      alert('Gagal mengubah status laporan.');
+    } finally {
+      setSavingId(null);
+    }
+  };
 
   return (
     <div className="space-y-4">
-      <p className="text-[#8c909f] text-sm">Kelola status & tingkat risiko insiden aktif. Bagian ini bisa kamu lanjutkan ke tabel risk_snapshots.</p>
-      {incidents.map((inc) => (
-        <div key={inc.id} className="bg-[#1d2027] border border-[rgba(255,255,255,0.06)] rounded-xl p-4">
-          <div className="flex items-start justify-between gap-3 flex-wrap">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1 flex-wrap">
-                <span className="text-[#8c909f] text-xs font-mono">{inc.id}</span>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${severityColor[inc.severity]}`}>{inc.severity}</span>
+      <div className="flex justify-between items-center gap-3">
+        <p className="text-[#8c909f] text-sm">Kelola status laporan insiden dari database.</p>
+        <button
+          onClick={load}
+          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#1d2027] border border-[rgba(255,255,255,0.08)] text-[#adc6ff] text-sm hover:bg-[rgba(173,198,255,0.08)]"
+        >
+          <RefreshCw size={14} /> Refresh
+        </button>
+      </div>
+
+      {error && (
+        <div className="bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.25)] rounded-xl p-4 text-[#ffb4ab] text-sm">
+          {error}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="bg-[#1d2027] border border-[rgba(255,255,255,0.06)] rounded-xl p-6 text-[#8c909f] text-sm">
+          Mengambil data laporan...
+        </div>
+      ) : reports.length === 0 ? (
+        <div className="bg-[#1d2027] border border-[rgba(255,255,255,0.06)] rounded-xl p-8 text-center">
+          <p className="text-[#8c909f] text-sm">Belum ada laporan.</p>
+        </div>
+      ) : (
+        reports.map((inc) => (
+          <div key={inc.id} className="bg-[#1d2027] border border-[rgba(255,255,255,0.06)] rounded-xl p-4">
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                  <span className="text-[#8c909f] text-xs font-mono truncate max-w-[140px]">{inc.id}</span>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${severityColor[inc.severity] || severityColor.SEDANG}`}>
+                    {inc.severity}
+                  </span>
+                </div>
+                <p className="text-[#e1e2ec] text-sm font-semibold">{inc.title}</p>
+                <p className="text-[#8c909f] text-xs mt-0.5">{inc.location_name || '-'}</p>
+                <div className="flex items-center gap-1.5 mt-2">
+                  <RefreshCw size={11} className="text-[#8c909f]" />
+                  <span className="text-[#8c909f] text-xs">
+                    Diperbarui: {timeAgo(inc.updated_at || inc.created_at)}
+                  </span>
+                </div>
               </div>
-              <p className="text-[#e1e2ec] text-sm font-semibold">{inc.title}</p>
-              <div className="flex items-center gap-1.5 mt-2">
-                <RefreshCw size={11} className="text-[#8c909f]" />
-                <span className="text-[#8c909f] text-xs">Freshness: {inc.freshness}</span>
+              <div className="shrink-0">
+                <label className="text-[#8c909f] text-[10px] uppercase tracking-widest block mb-1">Status</label>
+                <select
+                  value={inc.status}
+                  onChange={(e) => changeStatus(inc.id, e.target.value)}
+                  disabled={savingId === inc.id}
+                  className={`text-xs font-semibold px-3 py-1.5 rounded-lg border bg-[#10131a] focus:outline-none cursor-pointer disabled:opacity-50 ${riskStatusColor[inc.status] || 'text-[#8c909f] border-[rgba(255,255,255,0.08)]'}`}
+                >
+                  {riskStatusOptions.map((s) => (
+                    <option key={s.value} value={s.value} className="bg-[#1d2027] text-[#e1e2ec]">
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
               </div>
-            </div>
-            <div className="shrink-0">
-              <label className="text-[#8c909f] text-[10px] uppercase tracking-widest block mb-1">Status</label>
-              <select
-                value={inc.status}
-                onChange={(e) => changeStatus(inc.id, e.target.value)}
-                className={`text-xs font-semibold px-3 py-1.5 rounded-lg border bg-[#10131a] focus:outline-none cursor-pointer ${statusColor[inc.status]}`}
-              >
-                {statusOptions.map((s) => (
-                  <option key={s} value={s} className="bg-[#1d2027] text-[#e1e2ec]">
-                    {s}
-                  </option>
-                ))}
-              </select>
             </div>
           </div>
-        </div>
-      ))}
+        ))
+      )}
     </div>
   );
 }
@@ -225,7 +299,7 @@ export function AdminPortalPage() {
           </div>
         </div>
         <button
-          onClick={() => navigate('/dashboard')}
+          onClick={() => { sessionStorage.removeItem('admin_auth'); navigate('/dashboard'); }}
           className="flex items-center gap-1.5 text-[#8c909f] hover:text-[#e1e2ec] text-xs transition-colors"
         >
           <LogOut size={13} /> Keluar

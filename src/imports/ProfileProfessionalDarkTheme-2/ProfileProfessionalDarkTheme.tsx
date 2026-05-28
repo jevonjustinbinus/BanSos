@@ -117,7 +117,7 @@ function Link() {
         <div className="bg-clip-padding border-0 border-[transparent] border-solid content-stretch flex gap-[12px] items-center px-[16px] py-[12px] relative size-full">
           <Container5 />
           <div className="flex flex-col font-['Inter:Medium',sans-serif] font-medium h-[20px] justify-center leading-[0] not-italic relative shrink-0 text-[#94a3b8] text-[14px] tracking-[0.14px] w-[106.67px]">
-            <p className="leading-[19.6px]">Mission Control</p>
+            <p className="leading-[19.6px]">Dashboard</p>
           </div>
         </div>
       </div>

@@ -17,6 +17,7 @@ export function AdminLoginPage() {
     // Simulate auth — accept admin@bansос.id / admin123
     setTimeout(() => {
       if (email === 'admin@bansos.id' && password === 'admin123') {
+        sessionStorage.setItem('admin_auth', '1');
         navigate('/admin/portal');
       } else {
         setError('Email atau password tidak valid.');
@@ -124,10 +125,6 @@ export function AdminLoginPage() {
           </button>
         </form>
 
-        {/* Hint */}
-        <p className="text-[#4a5060] text-xs text-center mt-5">
-          Demo: admin@bansos.id · admin123
-        </p>
       </div>
     </div>
   );

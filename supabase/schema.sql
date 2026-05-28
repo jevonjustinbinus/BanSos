@@ -103,8 +103,26 @@ end $$;
 -- Because uploads are handled by the FastAPI backend using service role key,
 -- no public insert policy is required for storage.objects.
 
+create table if not exists saved_locations (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null,
+  name text not null,
+  address text not null,
+  latitude double precision,
+  longitude double precision,
+  status text not null default 'clear',
+  radius integer not null default 3,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+-- Add coordinates columns if table already exists (idempotent).
+alter table saved_locations add column if not exists latitude double precision;
+alter table saved_locations add column if not exists longitude double precision;
+
 -- Helpful indexes.
 create index if not exists reports_status_created_idx on reports(status, created_at desc);
 create index if not exists reports_location_idx on reports(latitude, longitude);
 create index if not exists report_media_report_id_idx on report_media(report_id);
 create index if not exists report_verifications_report_id_idx on report_verifications(report_id);
+create index if not exists saved_locations_user_id_idx on saved_locations(user_id, created_at desc);

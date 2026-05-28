@@ -83,8 +83,6 @@ def calculate_final_risk_score(
 
 def predict_flood_risk(lat, lng):
     geo_result = find_risk_polygon_by_latlng(lat, lng)
-    adm4_code = geo_result.get("kode_kelurahan")
-    weather_result = get_weather_score(adm4_code)
 
     if not geo_result.get("found"):
         return {
@@ -92,6 +90,7 @@ def predict_flood_risk(lat, lng):
             "message": geo_result.get("message")
         }
 
+    adm4_code = geo_result.get("kode_kelurahan")
     city_name = geo_result.get("kota_administrasi")
     static_result = get_historical_score_by_city(city_name)
 
@@ -114,7 +113,10 @@ def predict_flood_risk(lat, lng):
             "kecamatan": geo_result.get("kecamatan"),
             "kota_administrasi": geo_result.get("kota_administrasi"),
             "kode_kelurahan": geo_result.get("kode_kelurahan"),
-            "kode_kecamatan": geo_result.get("kode_kecamatan")
+            "kode_kecamatan": geo_result.get("kode_kecamatan"),
+            "is_fallback": geo_result.get("is_fallback", False),
+            "fallback_distance_m": geo_result.get("fallback_distance_m"),
+            "match_message": geo_result.get("message"),
         },
         "risk": {
             "final_score": float(round(final_score, 4)),
@@ -138,7 +140,12 @@ def predict_flood_risk(lat, lng):
                 for key, value in weather_result.items()
             },
             "water_station": water_result,
-            "static": static_result
+            "static": {
+                **static_result,
+                "polygon_match_message": geo_result.get("message"),
+                "is_polygon_fallback": geo_result.get("is_fallback", False),
+                "fallback_distance_m": geo_result.get("fallback_distance_m"),
+            }
         },
         "disclaimer": (
             "This result is a decision-support risk indicator, not an official flood warning. "

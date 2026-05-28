@@ -12,7 +12,6 @@ export interface Report {
   reporter: string;
   radius: string;
   trend: string;
-  tags: string[];
   confirmations: number;
   image?: string;
   riskLevel: 'high' | 'moderate' | 'safe';
@@ -34,7 +33,6 @@ export const reports: Report[] = [
     reporter: 'Unit 7-Alpha',
     radius: '~2.4 km',
     trend: 'Meningkat',
-    tags: ['#banjir', '#jalan-putus', '#evakuasi-diperlukan'],
     confirmations: 12,
     riskLevel: 'high',
     validated: true,
@@ -53,7 +51,6 @@ export const reports: Report[] = [
     reporter: 'Warga Setempat',
     radius: '~0.5 km',
     trend: 'Stabil',
-    tags: ['#lalulintas-macet', '#cuaca-buruk'],
     confirmations: 45,
     riskLevel: 'moderate',
     validated: true,
@@ -72,7 +69,6 @@ export const reports: Report[] = [
     reporter: 'Unit 3-Beta',
     radius: '~0.3 km',
     trend: 'Stabil',
-    tags: ['#perbaikan-pln', '#bahaya-listrik'],
     confirmations: 8,
     riskLevel: 'moderate',
     validated: false,
@@ -91,7 +87,6 @@ export const reports: Report[] = [
     reporter: 'Warga RT 05',
     radius: '~1.2 km',
     trend: 'Menurun',
-    tags: ['#genangan', '#pantauan-cuaca'],
     confirmations: 3,
     riskLevel: 'safe',
     validated: false,
@@ -110,7 +105,6 @@ export const reports: Report[] = [
     reporter: 'Unit 5-Delta',
     radius: '~0.8 km',
     trend: 'Membaik',
-    tags: ['#kecelakaan', '#macet', '#evakuasi'],
     confirmations: 27,
     riskLevel: 'high',
     validated: true,
@@ -129,7 +123,6 @@ export const reports: Report[] = [
     reporter: 'Unit 2-Gamma',
     radius: '~1.5 km',
     trend: 'Menurun',
-    tags: ['#kebakaran', '#damkar', '#industri'],
     confirmations: 19,
     riskLevel: 'moderate',
     validated: false,
