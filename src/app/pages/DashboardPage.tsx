@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { ThemedTileLayer } from '../components/ThemedTileLayer';
 import { useNavigate } from 'react-router';
 import {
   AlertTriangle,
@@ -9,8 +10,10 @@ import {
   Loader2,
   WifiOff,
   MapPin,
+  BookMarked,
+  ChevronDown,
 } from 'lucide-react';
-import { MapContainer, TileLayer, CircleMarker, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, CircleMarker, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { mapRiskPoints } from '../data/reports';
 import '../utils/leaflet-fix';
@@ -18,6 +21,7 @@ import { getCurrentUserLocation } from '../services/location';
 import {
   fetchFloodRisk,
   fetchReports,
+  fetchSavedLocations,
   riskLevelToLabel,
   riskLevelColor,
   riskLevelProgress,
@@ -25,14 +29,34 @@ import {
   trendToArrow,
   type FloodRiskResponse,
   type CommunityReport,
+  type SavedLocation,
 } from '../services/api';
+import { supabase } from '../services/supabaseClient';
+import { ThemeToggle } from '../components/ThemeToggle';
+import { useTheme } from '../context/ThemeContext';
 
-// Default monitoring coordinates — Kemang, Jakarta Selatan
 const DEFAULT_LAT = -6.1233;
 const DEFAULT_LNG = 106.8317;
 
-// Radius laporan yang dianggap relevan dari lokasi user
+const USER_LOCATION_KEY = 'bansos_user_location';
 const REPORT_RADIUS_KM = 5;
+
+function getSavedUserLocation(): { lat: number; lng: number } | null {
+  try {
+    const raw = sessionStorage.getItem(USER_LOCATION_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw) as { lat: number; lng: number };
+
+    if (typeof parsed.lat === 'number' && typeof parsed.lng === 'number') {
+      return parsed;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
 
 const userLocationIcon = L.divIcon({
   className: 'user-location-pin',
@@ -98,19 +122,51 @@ function formatReportTime(dateString?: string) {
   });
 }
 
-// Fixes Leaflet's container-size detection when inside a flex/grid layout
 function MapResizer() {
   const map = useMap();
 
   useEffect(() => {
-    const t = setTimeout(() => map.invalidateSize(), 100);
-    return () => clearTimeout(t);
+    const resizeMap = () => {
+      window.requestAnimationFrame(() => {
+        map.invalidateSize({
+          pan: false,
+        });
+      });
+    };
+
+    resizeMap();
+
+    const timers = [
+      window.setTimeout(resizeMap, 100),
+      window.setTimeout(resizeMap, 300),
+      window.setTimeout(resizeMap, 700),
+    ];
+
+    const mapContainer = map.getContainer();
+    const parentContainer = mapContainer.parentElement;
+
+    const observer = new ResizeObserver(() => {
+      resizeMap();
+    });
+
+    observer.observe(mapContainer);
+
+    if (parentContainer) {
+      observer.observe(parentContainer);
+    }
+
+    window.addEventListener('resize', resizeMap);
+
+    return () => {
+      timers.forEach((timer) => window.clearTimeout(timer));
+      observer.disconnect();
+      window.removeEventListener('resize', resizeMap);
+    };
   }, [map]);
 
   return null;
 }
 
-// Updates Leaflet map center when user location changes
 function MapCenterUpdater({ center }: { center: [number, number] }) {
   const map = useMap();
 
@@ -125,13 +181,15 @@ function LiveClock() {
   const [time, setTime] = useState(new Date());
 
   useEffect(() => {
-    const interval = setInterval(() => setTime(new Date()), 1000);
-    return () => clearInterval(interval);
+    const interval = window.setInterval(() => {
+      setTime(new Date());
+    }, 1000);
+
+    return () => window.clearInterval(interval);
   }, []);
 
   const pad = (n: number) => String(n).padStart(2, '0');
 
-  // WIB = UTC+7
   const wib = new Date(time.getTime() + 7 * 60 * 60 * 1000);
 
   return (
@@ -148,13 +206,76 @@ const severityBg: Record<string, string> = {
   PERINGATAN: 'bg-[#5c3c00] text-[#ffb786]',
 };
 
+function getWaterLevelLabel(alertStatus?: string | null) {
+  const status = alertStatus?.toUpperCase() ?? '';
+
+  if (
+    status.includes('SIAGA 1') ||
+    status.includes('BAHAYA') ||
+    status.includes('KRITIS')
+  ) {
+    return 'BAHAYA';
+  }
+
+  if (
+    status.includes('SIAGA 2') ||
+    status.includes('SIAGA 3') ||
+    status.includes('WASPADA')
+  ) {
+    return 'SIAGA';
+  }
+
+  return 'NORMAL';
+}
+
+function getWaterLevelBadgeClass(label: string) {
+  if (label === 'BAHAYA') {
+    return 'bg-[#93000a] text-[#ffdad6] border border-[rgba(255,180,171,0.25)]';
+  }
+
+  if (label === 'SIAGA') {
+    return 'bg-[#5c3c00] text-[#ffb786] border border-[rgba(255,183,134,0.25)]';
+  }
+
+  return 'bg-[#002105] text-[#7dd878] border border-[rgba(125,216,120,0.25)]';
+}
+
+function getWaterLevelTextColor(label: string) {
+  if (label === 'BAHAYA') return 'text-[#ffb4ab]';
+  if (label === 'SIAGA') return 'text-[#ffb786]';
+  return 'text-[#e1e2ec]';
+}
+
+function formatWaterAlertStatus(alertStatus?: string | null) {
+  const status = alertStatus?.toUpperCase() ?? '';
+
+  if (status.includes('SIAGA 1')) return 'Siaga 1 — Bahaya';
+  if (status.includes('SIAGA 2')) return 'Siaga 2 — Waspada';
+  if (status.includes('SIAGA 3')) return 'Siaga 3 — Siaga';
+  if (status.includes('BAHAYA')) return 'Bahaya';
+  if (status.includes('WASPADA')) return 'Waspada';
+  if (status.includes('NORMAL') || status.includes('AMAN')) return 'Normal';
+
+  return alertStatus || 'Data dari sensor/pos air terdekat.';
+}
+
 export function DashboardPage() {
   const navigate = useNavigate();
+  const { theme } = useTheme();
 
-  const coordsRef = useRef({
-    lat: DEFAULT_LAT,
-    lng: DEFAULT_LNG,
-  });
+  const mapTileUrl =
+    theme === 'light'
+      ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
+      : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+
+  const mapBackground = theme === 'light' ? '#eef2f7' : '#10131a';
+
+  const coordsRef = useRef(
+    (() => {
+      const saved = getSavedUserLocation();
+      return saved ?? { lat: DEFAULT_LAT, lng: DEFAULT_LNG };
+    })(),
+  );
 
   const [acknowledged, setAcknowledged] = useState(false);
 
@@ -164,12 +285,42 @@ export function DashboardPage() {
   const [locationLoading, setLocationLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [userCoords, setUserCoords] = useState({
-    lat: DEFAULT_LAT,
-    lng: DEFAULT_LNG,
+  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number }>(() => {
+    const saved = getSavedUserLocation();
+    return saved ?? { lat: DEFAULT_LAT, lng: DEFAULT_LNG };
   });
 
-  const [usingUserLocation, setUsingUserLocation] = useState(false);
+  const [usingUserLocation, setUsingUserLocation] = useState(() => getSavedUserLocation() !== null);
+
+  const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([]);
+  const [showLocDropdown, setShowLocDropdown] = useState(false);
+  const [activeLocationId, setActiveLocationId] = useState<string | null>(null);
+  const locDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(async ({ data }) => {
+      if (!data.user) return;
+
+      try {
+        const result = await fetchSavedLocations(data.user.id);
+        setSavedLocations(result.data.filter((l) => l.latitude != null && l.longitude != null));
+      } catch {
+        // non-critical
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (locDropdownRef.current && !locDropdownRef.current.contains(e.target as Node)) {
+        setShowLocDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handler);
+
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   const updateCoords = useCallback((lat: number, lng: number) => {
     coordsRef.current = { lat, lng };
@@ -191,16 +342,7 @@ export function DashboardPage() {
       try {
         const data = await fetchFloodRisk(targetLat, targetLng);
 
-        console.log('REQUEST COORDS:', {
-          lat: targetLat,
-          lng: targetLng,
-        });
-        console.log('RISK RESPONSE:', data);
-
         setRiskData(data);
-
-        // Untuk pinpoint, simpan koordinat asli user/request,
-        // bukan centroid polygon dari backend.
         updateCoords(targetLat, targetLng);
 
         const reportsResult = await fetchReports();
@@ -215,7 +357,7 @@ export function DashboardPage() {
             targetLat,
             targetLng,
             report.latitude,
-            report.longitude
+            report.longitude,
           );
 
           return reportDistance <= REPORT_RADIUS_KM;
@@ -229,11 +371,27 @@ export function DashboardPage() {
         setLoading(false);
       }
     },
-    [updateCoords]
+    [updateCoords],
   );
+
+  const handleSelectSavedLocation = async (loc: SavedLocation) => {
+    if (loc.latitude == null || loc.longitude == null) return;
+
+    setShowLocDropdown(false);
+    setActiveLocationId(loc.id);
+    setUsingUserLocation(false);
+    setLocationLoading(true);
+
+    try {
+      await loadRiskData(loc.latitude, loc.longitude);
+    } finally {
+      setLocationLoading(false);
+    }
+  };
 
   const handleUseMyLocation = async () => {
     setLocationLoading(true);
+    setActiveLocationId(null);
     setError(null);
 
     try {
@@ -254,11 +412,11 @@ export function DashboardPage() {
   useEffect(() => {
     loadRiskData();
 
-    const interval = setInterval(() => {
+    const interval = window.setInterval(() => {
       loadRiskData();
     }, 5 * 60 * 1000);
 
-    return () => clearInterval(interval);
+    return () => window.clearInterval(interval);
   }, [loadRiskData]);
 
   const riskPointColors: Record<string, string> = {
@@ -279,6 +437,10 @@ export function DashboardPage() {
   const waterDistance = riskData?.details.water_station.distance_km;
   const waterFreshnessWarning = riskData?.details.water_station.freshness.warning;
 
+  const waterAlertStatus = riskData?.details.water_station.alert_status;
+  const waterLevelLabel = getWaterLevelLabel(waterAlertStatus);
+  const isDangerWaterLevel = waterLevelLabel === 'BAHAYA';
+
   const locationName = riskData
     ? `${riskData.location.kelurahan}, ${riskData.location.kota_administrasi}`
     : 'Kemang, Jakarta Selatan';
@@ -298,7 +460,6 @@ export function DashboardPage() {
 
   return (
     <div className="p-4 lg:p-6 space-y-4 lg:space-y-6 text-[#e1e2ec]">
-      {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-2">
         <div>
           <h1 className="text-[#e1e2ec] text-2xl lg:text-3xl font-semibold tracking-tight">
@@ -340,35 +501,130 @@ export function DashboardPage() {
               Gunakan Lokasi Saya
             </button>
 
+            {savedLocations.length > 0 && (
+              <div className="relative" ref={locDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setShowLocDropdown((v) => !v)}
+                  disabled={loading || locationLoading}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                    activeLocationId
+                      ? 'border-[#4ade80]/50 text-[#4ade80] bg-[rgba(74,222,128,0.08)]'
+                      : 'border-[#adc6ff]/40 text-[#adc6ff] hover:bg-[rgba(173,198,255,0.12)]'
+                  }`}
+                >
+                  <BookMarked size={12} />
+                  {activeLocationId
+                    ? (savedLocations.find((l) => l.id === activeLocationId)?.name ??
+                      'Lokasi Tersimpan')
+                    : 'Lokasi Tersimpan'}
+                  <ChevronDown
+                    size={11}
+                    className={`transition-transform ${showLocDropdown ? 'rotate-180' : ''}`}
+                  />
+                </button>
+
+                {showLocDropdown && (
+                  <div className="absolute left-0 top-full mt-1.5 z-[500] w-64 bg-[#1d2027] border border-[rgba(255,255,255,0.1)] rounded-xl shadow-2xl overflow-hidden">
+                    <p className="px-3 py-2 text-[10px] uppercase tracking-widest text-[#8c909f] border-b border-[rgba(255,255,255,0.06)]">
+                      Pilih Lokasi Pantauan
+                    </p>
+
+                    <ul className="max-h-52 overflow-y-auto">
+                      {savedLocations.map((loc) => {
+                        const hasCoords = loc.latitude != null && loc.longitude != null;
+
+                        return (
+                          <li key={loc.id}>
+                            <button
+                              type="button"
+                              onClick={() => hasCoords && handleSelectSavedLocation(loc)}
+                              disabled={!hasCoords}
+                              className={`w-full flex items-start gap-2.5 px-3 py-2.5 text-left transition-colors border-b border-[rgba(255,255,255,0.04)] last:border-0 ${
+                                !hasCoords
+                                  ? 'opacity-40 cursor-not-allowed'
+                                  : activeLocationId === loc.id
+                                    ? 'bg-[rgba(74,222,128,0.08)]'
+                                    : 'hover:bg-[rgba(173,198,255,0.06)]'
+                              }`}
+                            >
+                              <MapPin
+                                size={13}
+                                className={`shrink-0 mt-0.5 ${
+                                  activeLocationId === loc.id
+                                    ? 'text-[#4ade80]'
+                                    : 'text-[#adc6ff]'
+                                }`}
+                              />
+
+                              <div className="min-w-0">
+                                <p
+                                  className={`text-sm font-medium truncate ${
+                                    activeLocationId === loc.id
+                                      ? 'text-[#4ade80]'
+                                      : 'text-[#e1e2ec]'
+                                  }`}
+                                >
+                                  {loc.name}
+                                </p>
+
+                                <p className="text-[#8c909f] text-xs truncate">
+                                  {loc.address}
+                                </p>
+
+                                {!hasCoords && (
+                                  <p className="text-[#ffb786] text-[10px] mt-0.5">
+                                    Koordinat belum ada — atur ulang di Settings
+                                  </p>
+                                )}
+                              </div>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+
             <p className="basis-full text-[#8c909f] text-xs mt-1">
               Lat {userCoords.lat.toFixed(5)} · Lng {userCoords.lng.toFixed(5)}
             </p>
           </div>
         </div>
 
-        <div className="text-right">
-          <p className="text-[#8c909f] text-xs uppercase tracking-widest mb-1">
-            System Time
-          </p>
-          <LiveClock />
+        <div className="flex items-center gap-3">
+          <ThemeToggle />
+
+          <div className="text-right">
+            <p className="text-[#8c909f] text-xs uppercase tracking-widest mb-1">
+              System Time
+            </p>
+            <LiveClock />
+          </div>
         </div>
       </div>
 
-      {/* Backend / Location Error Banner */}
       {error && (
         <div className="flex items-start justify-between gap-3 p-4 rounded-xl bg-[rgba(100,100,100,0.15)] border border-[rgba(255,255,255,0.15)]">
           <div className="flex items-start gap-3">
             <WifiOff size={18} className="text-[#8c909f] mt-0.5 shrink-0" />
+
             <div>
               <p className="text-[#e1e2ec] font-semibold text-sm lg:text-base">
                 Data Tidak Tersambung
               </p>
+
               <p className="text-[#8c909f] text-xs lg:text-sm mt-0.5">
                 Pastikan backend berjalan di{' '}
                 <code className="text-[#adc6ff]">localhost:8000</code>. Jika masalah
                 berasal dari lokasi, pastikan izin lokasi browser sudah aktif.
               </p>
-              <p className="text-[#8c909f] text-[10px] mt-1 font-mono">{error}</p>
+
+              <p className="text-[#8c909f] text-[10px] mt-1 font-mono">
+                {error}
+              </p>
             </div>
           </div>
 
@@ -381,14 +637,15 @@ export function DashboardPage() {
         </div>
       )}
 
-      {/* Data freshness warning */}
       {waterFreshnessWarning && !loading && !error && (
         <div className="flex items-start gap-3 p-4 rounded-xl bg-[rgba(92,60,0,0.25)] border border-[rgba(255,183,134,0.25)]">
           <AlertTriangle size={18} className="text-[#ffb786] mt-0.5 shrink-0" />
+
           <div>
             <p className="text-[#ffb786] font-semibold text-sm lg:text-base">
               Peringatan Data Sensor
             </p>
+
             <p className="text-[#e1e2ec] text-xs lg:text-sm mt-0.5">
               {waterFreshnessWarning}
             </p>
@@ -396,15 +653,34 @@ export function DashboardPage() {
         </div>
       )}
 
-      {/* Alert Banner — only when risk is HIGH */}
+      {isDangerWaterLevel && !loading && !error && (
+        <div className="flex items-start gap-3 p-4 rounded-xl bg-[rgba(185,28,28,0.15)] border border-[rgba(255,68,68,0.3)]">
+          <AlertTriangle size={18} className="text-[#ffb4ab] mt-0.5 shrink-0" />
+
+          <div>
+            <p className="text-[#ffb4ab] font-semibold text-sm lg:text-base">
+              Peringatan Tinggi Muka Air
+            </p>
+
+            <p className="text-[#e1e2ec] text-xs lg:text-sm mt-0.5">
+              Tinggi muka air di pos {waterStationName} berada pada level bahaya
+              {waterLevel !== null && waterLevel !== undefined ? ` (${waterLevel} cm)` : ''}.
+              Tetap waspada dan pantau laporan terbaru di sekitar lokasi Anda.
+            </p>
+          </div>
+        </div>
+      )}
+
       {!acknowledged && isHighRisk && !loading && !error && (
         <div className="flex items-start justify-between gap-3 p-4 rounded-xl bg-[rgba(185,28,28,0.15)] border border-[rgba(255,68,68,0.3)]">
           <div className="flex items-start gap-3">
             <AlertTriangle size={18} className="text-[#ffb4ab] mt-0.5 shrink-0" />
+
             <div>
               <p className="text-[#ffb4ab] font-semibold text-sm lg:text-base">
                 RISIKO TINGGI:
               </p>
+
               <p className="text-[#e1e2ec] text-xs lg:text-sm mt-0.5">
                 Potensi banjir di area {locationName} — probabilitas{' '}
                 {probabilityPct.toFixed(1)}% berdasarkan data BMKG & model analisis.
@@ -421,14 +697,13 @@ export function DashboardPage() {
         </div>
       )}
 
-      {/* Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
-        {/* Risk Level */}
         <div className="bg-[#1d2027] border border-[rgba(255,255,255,0.06)] rounded-xl p-3 lg:p-4">
           <div className="flex items-center justify-between mb-2">
             <p className="text-[#8c909f] text-[10px] lg:text-xs uppercase tracking-widest">
               Level Risiko
             </p>
+
             {loading ? (
               <Loader2 size={14} className="text-[#8c909f] animate-spin" />
             ) : (
@@ -454,12 +729,12 @@ export function DashboardPage() {
           </div>
         </div>
 
-        {/* Risk Trend */}
         <div className="bg-[#1d2027] border border-[rgba(255,255,255,0.06)] rounded-xl p-3 lg:p-4">
           <div className="flex items-center justify-between mb-2">
             <p className="text-[#8c909f] text-[10px] lg:text-xs uppercase tracking-widest">
               Tren Risiko
             </p>
+
             {loading ? (
               <Loader2 size={14} className="text-[#8c909f] animate-spin" />
             ) : (
@@ -476,12 +751,12 @@ export function DashboardPage() {
           </p>
         </div>
 
-        {/* Active Weather */}
         <div className="bg-[#1d2027] border border-[rgba(255,255,255,0.06)] rounded-xl p-3 lg:p-4">
           <div className="flex items-center justify-between mb-2">
             <p className="text-[#8c909f] text-[10px] lg:text-xs uppercase tracking-widest">
               Cuaca Aktif
             </p>
+
             {loading ? (
               <Loader2 size={14} className="text-[#8c909f] animate-spin" />
             ) : (
@@ -498,12 +773,12 @@ export function DashboardPage() {
           </p>
         </div>
 
-        {/* Reports Today */}
         <div className="bg-[#1d2027] border border-[rgba(255,255,255,0.06)] rounded-xl p-3 lg:p-4">
           <div className="flex items-center justify-between mb-2">
             <p className="text-[#8c909f] text-[10px] lg:text-xs uppercase tracking-widest">
               Laporan Sekitar
             </p>
+
             <FileText size={14} className="text-[#adc6ff]" />
           </div>
 
@@ -517,15 +792,16 @@ export function DashboardPage() {
         </div>
       </div>
 
-      {/* Supporting data cards */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="bg-[#1d2027] border border-[rgba(255,255,255,0.06)] rounded-xl p-4">
           <p className="text-[#8c909f] text-xs uppercase tracking-widest mb-2">
             Pos Air Terdekat
           </p>
+
           <p className="text-[#e1e2ec] font-semibold">
             {loading ? 'Memuat...' : waterStationName}
           </p>
+
           <p className="text-[#8c909f] text-xs mt-1">
             {loading
               ? ''
@@ -536,33 +812,46 @@ export function DashboardPage() {
         </div>
 
         <div className="bg-[#1d2027] border border-[rgba(255,255,255,0.06)] rounded-xl p-4">
-          <p className="text-[#8c909f] text-xs uppercase tracking-widest mb-2">
-            Tinggi Muka Air
-          </p>
-          <p className="text-[#e1e2ec] font-semibold">
+          <div className="flex items-start justify-between gap-3 mb-2">
+            <p className="text-[#8c909f] text-xs uppercase tracking-widest">
+              Tinggi Muka Air
+            </p>
+
+            {!loading && (
+              <span
+                className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase ${getWaterLevelBadgeClass(
+                  waterLevelLabel,
+                )}`}
+              >
+                {waterLevelLabel}
+              </span>
+            )}
+          </div>
+
+          <p className={`font-semibold text-xl ${getWaterLevelTextColor(waterLevelLabel)}`}>
             {loading
               ? 'Memuat...'
               : waterLevel !== null && waterLevel !== undefined
                 ? `${waterLevel} cm`
                 : 'Tidak tersedia'}
           </p>
+
           <p className="text-[#8c909f] text-xs mt-1">
-            Data dari sensor/pos air terdekat.
+            {loading ? '' : formatWaterAlertStatus(waterAlertStatus)}
           </p>
         </div>
       </div>
 
-      {/* Map + Recent Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-        {/* Map card */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-stretch">
         <div
-          className="lg:col-span-3 bg-[#1d2027] border border-[rgba(255,255,255,0.06)] rounded-xl overflow-hidden cursor-pointer hover:border-[rgba(173,198,255,0.3)] transition-colors flex flex-col"
+          className="lg:col-span-3 bg-[#1d2027] border border-[rgba(255,255,255,0.06)] rounded-xl overflow-hidden cursor-pointer hover:border-[rgba(173,198,255,0.3)] transition-colors flex flex-col min-h-[420px] max-h-[620px]"
           style={{ isolation: 'isolate' }}
           onClick={() => navigate('/dashboard/map')}
         >
           <div className="flex items-center justify-between px-4 py-3 border-b border-[rgba(255,255,255,0.06)] shrink-0">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 bg-[#adc6ff] rounded-full animate-pulse" />
+
               <span className="text-[#8c909f] text-xs uppercase tracking-widest font-semibold">
                 Jakarta Tactical Grid
               </span>
@@ -572,11 +861,12 @@ export function DashboardPage() {
               <span className="text-[#8c909f] text-xs hidden sm:inline">
                 LAT {userCoords.lat.toFixed(4)} | LNG {userCoords.lng.toFixed(4)}
               </span>
+
               <ExternalLink size={12} className="text-[#adc6ff]" />
             </div>
           </div>
 
-          <div className="flex-1 relative min-h-[260px]">
+          <div className="relative flex-1 min-h-[360px]">
             <MapContainer
               center={[userCoords.lat, userCoords.lng]}
               zoom={12}
@@ -589,18 +879,15 @@ export function DashboardPage() {
                 inset: 0,
                 height: '100%',
                 width: '100%',
-                background: '#10131a',
+                background: mapBackground,
               }}
             >
               <MapResizer />
+
               <MapCenterUpdater center={[userCoords.lat, userCoords.lng]} />
 
-              <TileLayer
-                url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-                attribution='&copy; <a href="https://carto.com/">CARTO</a>'
-              />
+              <ThemedTileLayer />
 
-              {/* User current/default location pinpoint */}
               <Marker position={[userCoords.lat, userCoords.lng]} icon={userLocationIcon}>
                 <Popup>
                   <div style={{ minWidth: 160 }}>
@@ -617,7 +904,6 @@ export function DashboardPage() {
                 </Popup>
               </Marker>
 
-              {/* Soft radius around user location */}
               <CircleMarker
                 center={[userCoords.lat, userCoords.lng]}
                 radius={18}
@@ -629,22 +915,32 @@ export function DashboardPage() {
                 }}
               />
 
-              {/* Nearby user reports */}
               {dashboardReports.map((report) => (
                 <CircleMarker
                   key={report.id}
                   center={[report.latitude, report.longitude]}
                   radius={7}
                   pathOptions={{
-                    color: riskLevelColor(report.severity === 'KRITIS' ? 'HIGH' : report.severity === 'SEDANG' ? 'MEDIUM' : 'LOW'),
-                    fillColor: riskLevelColor(report.severity === 'KRITIS' ? 'HIGH' : report.severity === 'SEDANG' ? 'MEDIUM' : 'LOW'),
+                    color: riskLevelColor(
+                      report.severity === 'KRITIS'
+                        ? 'HIGH'
+                        : report.severity === 'SEDANG'
+                          ? 'MEDIUM'
+                          : 'LOW',
+                    ),
+                    fillColor: riskLevelColor(
+                      report.severity === 'KRITIS'
+                        ? 'HIGH'
+                        : report.severity === 'SEDANG'
+                          ? 'MEDIUM'
+                          : 'LOW',
+                    ),
                     fillOpacity: 0.85,
                     weight: 2,
                   }}
                 />
               ))}
 
-              {/* Existing static risk points */}
               {mapRiskPoints.map((point) => (
                 <CircleMarker
                   key={point.id}
@@ -670,17 +966,18 @@ export function DashboardPage() {
           </div>
         </div>
 
-        {/* Recent Activity */}
-        <div className="lg:col-span-2 bg-[#1d2027] border border-[rgba(255,255,255,0.06)] rounded-xl overflow-hidden flex flex-col">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-[rgba(255,255,255,0.06)]">
+        <div className="lg:col-span-2 bg-[#1d2027] border border-[rgba(255,255,255,0.06)] rounded-xl overflow-hidden flex flex-col min-h-[420px] max-h-[620px]">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-[rgba(255,255,255,0.06)] shrink-0">
             <div className="flex items-center gap-2">
               <FileText size={14} className="text-[#adc6ff]" />
+
               <span className="text-[#e1e2ec] text-sm font-semibold uppercase tracking-wide">
                 Recent Activity
               </span>
             </div>
 
             <button
+              type="button"
               onClick={() => navigate('/dashboard/reports')}
               className="text-[#adc6ff] text-xs hover:underline"
             >
@@ -688,12 +985,13 @@ export function DashboardPage() {
             </button>
           </div>
 
-          <div className="flex-1 overflow-auto divide-y divide-[rgba(255,255,255,0.04)]">
+          <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-[rgba(255,255,255,0.04)]">
             {recentReports.length === 0 ? (
               <div className="p-4">
                 <p className="text-[#e1e2ec] text-sm font-medium">
                   Belum ada laporan di sekitar lokasi ini.
                 </p>
+
                 <p className="text-[#8c909f] text-xs mt-1">
                   Radius pemantauan saat ini: {REPORT_RADIUS_KM} km.
                 </p>
@@ -733,22 +1031,6 @@ export function DashboardPage() {
                   <p className="text-[#8c909f] text-xs mt-1 line-clamp-1">
                     {report.location_name ?? 'Lokasi tidak tersedia'}
                   </p>
-
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {(report.tags && report.tags.length > 0
-                      ? report.tags
-                      : [report.category]
-                    )
-                      .slice(0, 2)
-                      .map((tag) => (
-                        <span
-                          key={tag}
-                          className="text-xs bg-[rgba(173,198,255,0.1)] text-[#adc6ff] px-1.5 py-0.5 rounded"
-                        >
-                          #{tag}
-                        </span>
-                      ))}
-                  </div>
                 </div>
               ))
             )}

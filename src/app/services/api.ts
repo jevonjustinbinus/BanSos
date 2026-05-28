@@ -110,7 +110,6 @@ export interface CommunityReport {
   location_name?: string | null;
   status: 'pending' | 'approved' | 'rejected' | 'duplicate' | 'need_review' | 'resolved' | string;
   confidence_score?: number | null;
-  tags?: string[] | null;
   created_at?: string;
   updated_at?: string;
   report_media?: ReportMedia[];
@@ -126,7 +125,6 @@ export interface ReportPayload {
   location_name?: string;
   user_id?: string;
   reporter_name?: string;
-  tags?: string[];
 }
 
 export interface BroadcastPayload {
@@ -138,6 +136,42 @@ export interface BroadcastPayload {
   longitude?: number;
   radius_m?: number;
   admin_id?: string;
+}
+
+export interface BroadcastAlert {
+  id: string;
+  admin_id?: string | null;
+  title: string;
+  message: string;
+  severity: string;
+  target_location?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  radius_m?: number | null;
+  created_at?: string;
+}
+
+export interface SavedLocation {
+  id: string;
+  user_id: string;
+  name: string;
+  address: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  status: 'clear' | 'alert';
+  radius: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface SavedLocationPayload {
+  user_id: string;
+  name: string;
+  address: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  status: 'clear' | 'alert';
+  radius: number;
 }
 
 export interface AdminOverview {
@@ -246,6 +280,15 @@ export async function fetchReportDetail(reportId: string): Promise<{ success: bo
   return parseJsonResponse(response, 'Failed to fetch report detail');
 }
 
+export async function confirmReport(reportId: string): Promise<{ success: boolean; data: CommunityReport }> {
+  const response = await fetch(`${API_BASE}/reports/${reportId}/confirm`, {
+    method: 'POST',
+    headers: { Accept: 'application/json' },
+  });
+
+  return parseJsonResponse(response, 'Failed to confirm report');
+}
+
 export async function updateReportStatus(
   reportId: string,
   status: string,
@@ -275,7 +318,7 @@ export async function fetchAdminOverview(): Promise<{ success: boolean; data: Ad
   return parseJsonResponse(response, 'Failed to fetch admin overview');
 }
 
-export async function createBroadcast(payload: BroadcastPayload): Promise<{ success: boolean; data: unknown }> {
+export async function createBroadcast(payload: BroadcastPayload): Promise<{ success: boolean; data: BroadcastAlert }> {
   const response = await fetch(`${API_BASE}/broadcasts`, {
     method: 'POST',
     headers: {
@@ -288,13 +331,52 @@ export async function createBroadcast(payload: BroadcastPayload): Promise<{ succ
   return parseJsonResponse(response, 'Failed to create broadcast');
 }
 
-export async function fetchBroadcasts(): Promise<{ success: boolean; data: unknown[] }> {
+export async function fetchBroadcasts(): Promise<{ success: boolean; data: BroadcastAlert[] }> {
   const response = await fetch(`${API_BASE}/broadcasts`, {
     method: 'GET',
     headers: { Accept: 'application/json' },
   });
 
   return parseJsonResponse(response, 'Failed to fetch broadcasts');
+}
+
+// ── Saved Locations API Functions ──────────────────────────────
+
+export async function fetchSavedLocations(userId: string): Promise<{ success: boolean; data: SavedLocation[] }> {
+  const response = await fetch(`${API_BASE}/saved-locations?user_id=${encodeURIComponent(userId)}`, {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+  });
+  return parseJsonResponse(response, 'Failed to fetch saved locations');
+}
+
+export async function createSavedLocation(payload: SavedLocationPayload): Promise<{ success: boolean; data: SavedLocation }> {
+  const response = await fetch(`${API_BASE}/saved-locations`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return parseJsonResponse(response, 'Failed to create saved location');
+}
+
+export async function updateSavedLocation(
+  locationId: string,
+  patch: Partial<Pick<SavedLocationPayload, 'name' | 'address' | 'status' | 'radius'>>
+): Promise<{ success: boolean; data: SavedLocation }> {
+  const response = await fetch(`${API_BASE}/saved-locations/${locationId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(patch),
+  });
+  return parseJsonResponse(response, 'Failed to update saved location');
+}
+
+export async function deleteSavedLocation(locationId: string): Promise<{ success: boolean; data: null }> {
+  const response = await fetch(`${API_BASE}/saved-locations/${locationId}`, {
+    method: 'DELETE',
+    headers: { Accept: 'application/json' },
+  });
+  return parseJsonResponse(response, 'Failed to delete saved location');
 }
 
 // ── Helper Formatters ───────────────────────────────────────────

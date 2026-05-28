@@ -1,53 +1,163 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router';
+import { supabase } from '../services/supabaseClient';
+import {
+  fetchReports,
+  fetchSavedLocations,
+  createSavedLocation,
+  updateSavedLocation,
+  deleteSavedLocation,
+  type SavedLocation as APISavedLocation,
+} from '../services/api';
 import { ChevronRight, Plus, Trash2, MapPin, Bell, Shield, Database, Edit3, BarChart2, X, FileText } from 'lucide-react';
 import imgProfilePicture from '../../imports/ProfileProfessionalDarkTheme-2/05bf566309a931f21d624caab9298ae2c690b994.png';
 import imgMapView from '../../imports/ProfileProfessionalDarkTheme-2/95a1e6ef9cc5afd696639f1af1a49888c9223daf.png';
 
-interface SavedLocation {
-  id: string;
-  name: string;
-  address: string;
-  status: 'clear' | 'alert';
-  radius: number; // km
+interface NominatimResult {
+  place_id: number;
+  display_name: string;
+  lat: string;
+  lon: string;
 }
+
+type SavedLocation = APISavedLocation;
 
 export function SettingsPage() {
   const navigate = useNavigate();
+  const [userName, setUserName] = useState('');
+  const [userEmail, setUserEmail] = useState('');
+  const [joinedYear, setJoinedYear] = useState('');
+  const [totalReports, setTotalReports] = useState<number | null>(null);
+  const [userId, setUserId] = useState('');
+  const [locations, setLocations] = useState<SavedLocation[]>([]);
+  const [locationsLoading, setLocationsLoading] = useState(true);
+  const [locationError, setLocationError] = useState('');
 
-  const [locations, setLocations] = useState<SavedLocation[]>([
-    { id: '1', name: 'Primary Residence', address: 'Jl. Sudirman No. 45, Jakarta Selatan', status: 'clear', radius: 2 },
-    { id: '2', name: 'Office District', address: 'SCBD Tower 2, Jakarta Selatan', status: 'alert', radius: 5 },
-  ]);
+  useEffect(() => {
+    supabase.auth.getUser().then(async ({ data }) => {
+      if (!data.user) return;
+
+      const uid = data.user.id;
+      setUserId(uid);
+      setUserName(data.user.user_metadata?.full_name ?? data.user.email ?? '');
+      setUserEmail(data.user.email ?? '');
+      setJoinedYear(new Date(data.user.created_at).getFullYear().toString());
+
+      try {
+        const [locResult, reportResult] = await Promise.allSettled([
+          fetchSavedLocations(uid),
+          fetchReports(),
+        ]);
+        if (locResult.status === 'fulfilled') setLocations(locResult.value.data);
+        setTotalReports(reportResult.status === 'fulfilled' ? reportResult.value.data.length : 0);
+      } catch {
+        setTotalReports(0);
+      } finally {
+        setLocationsLoading(false);
+      }
+    });
+  }, []);
 
   // ── Add Location modal ──────────────────────────────────────
   const [showAddModal, setShowAddModal] = useState(false);
   const [newName, setNewName] = useState('');
   const [newAddress, setNewAddress] = useState('');
+  const [newLat, setNewLat] = useState<number | null>(null);
+  const [newLng, setNewLng] = useState<number | null>(null);
   const [newStatus, setNewStatus] = useState<'clear' | 'alert'>('clear');
   const [newRadius, setNewRadius] = useState(3);
+  const [addressSuggestions, setAddressSuggestions] = useState<NominatimResult[]>([]);
+  const [addressLoading, setAddressLoading] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const suggestionBoxRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (suggestionBoxRef.current && !suggestionBoxRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleAddressChange = (value: string) => {
+    setNewAddress(value);
+    setNewLat(null);
+    setNewLng(null);
+    setShowSuggestions(false);
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (value.trim().length < 3) {
+      setAddressSuggestions([]);
+      return;
+    }
+
+    debounceRef.current = setTimeout(async () => {
+      setAddressLoading(true);
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(value)}&format=json&addressdetails=1&limit=6&countrycodes=id`,
+          { headers: { 'Accept-Language': 'id' } }
+        );
+        const data: NominatimResult[] = await res.json();
+        setAddressSuggestions(data);
+        setShowSuggestions(data.length > 0);
+      } catch {
+        setAddressSuggestions([]);
+      } finally {
+        setAddressLoading(false);
+      }
+    }, 400);
+  };
+
+  const handleSelectSuggestion = (suggestion: NominatimResult) => {
+    setNewAddress(suggestion.display_name);
+    setNewLat(parseFloat(suggestion.lat));
+    setNewLng(parseFloat(suggestion.lon));
+    setAddressSuggestions([]);
+    setShowSuggestions(false);
+  };
 
   const openAddModal = () => {
     setNewName('');
     setNewAddress('');
+    setNewLat(null);
+    setNewLng(null);
     setNewStatus('clear');
     setNewRadius(3);
+    setAddressSuggestions([]);
+    setShowSuggestions(false);
+    setLocationError('');
     setShowAddModal(true);
   };
 
-  const handleAddLocation = () => {
-    if (!newName.trim() || !newAddress.trim()) return;
-    setLocations((prev) => [
-      ...prev,
-      {
-        id: Date.now().toString(),
+  const [addingLocation, setAddingLocation] = useState(false);
+
+  const handleAddLocation = async () => {
+    if (!newName.trim() || !newAddress.trim() || !userId) return;
+    setAddingLocation(true);
+    setLocationError('');
+    try {
+      const result = await createSavedLocation({
+        user_id: userId,
         name: newName.trim(),
         address: newAddress.trim(),
+        latitude: newLat,
+        longitude: newLng,
         status: newStatus,
         radius: newRadius,
-      },
-    ]);
-    setShowAddModal(false);
+      });
+      setLocations((prev) => [...prev, result.data]);
+      setShowAddModal(false);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[AddLocation]', msg);
+      setLocationError(msg || 'Gagal menyimpan lokasi.');
+    } finally {
+      setAddingLocation(false);
+    }
   };
 
   // ── Edit Radius modal ───────────────────────────────────────
@@ -59,16 +169,32 @@ export function SettingsPage() {
     setEditRadius(loc.radius);
   };
 
-  const handleSaveRadius = () => {
+  const [savingRadius, setSavingRadius] = useState(false);
+
+  const handleSaveRadius = async () => {
     if (!editingLocation) return;
-    setLocations((prev) =>
-      prev.map((l) => (l.id === editingLocation.id ? { ...l, radius: editRadius } : l))
-    );
-    setEditingLocation(null);
+    setSavingRadius(true);
+    try {
+      await updateSavedLocation(editingLocation.id, { radius: editRadius });
+      setLocations((prev) =>
+        prev.map((l) => (l.id === editingLocation.id ? { ...l, radius: editRadius } : l))
+      );
+      setEditingLocation(null);
+    } catch {
+      setLocationError('Gagal memperbarui radius. Coba lagi.');
+    } finally {
+      setSavingRadius(false);
+    }
   };
 
-  const removeLocation = (id: string) => {
+  const removeLocation = async (id: string) => {
     setLocations((prev) => prev.filter((l) => l.id !== id));
+    try {
+      await deleteSavedLocation(id);
+    } catch {
+      const result = await fetchSavedLocations(userId).catch(() => null);
+      if (result) setLocations(result.data);
+    }
   };
 
   const settingsRows = [
@@ -99,15 +225,15 @@ export function SettingsPage() {
           <div className="relative flex items-center gap-4 lg:gap-6 p-5 lg:p-6">
             <div className="relative shrink-0">
               <div className="size-16 lg:size-24 rounded-full overflow-hidden border-4 border-white shadow-md">
-                <img src={imgProfilePicture} alt="Alex Mercer" className="size-full object-cover" />
+                <img src={imgProfilePicture} alt={userName} className="size-full object-cover" />
               </div>
               <button className="absolute bottom-0 right-0 w-7 h-7 bg-white rounded-full flex items-center justify-center border border-[#e1e2ec] shadow-sm hover:bg-gray-100 transition-colors">
                 <Edit3 size={11} className="text-gray-700" />
               </button>
             </div>
             <div className="flex-1 min-w-0">
-              <h2 className="text-[#e1e2ec] text-2xl lg:text-[32px] font-semibold tracking-tight">Alex Mercer</h2>
-              <p className="text-[#e1e2ec] text-sm lg:text-base mt-0.5">alex.mercer@example.com</p>
+              <h2 className="text-[#e1e2ec] text-2xl lg:text-[32px] font-semibold tracking-tight">{userName || '...'}</h2>
+              <p className="text-[#e1e2ec] text-sm lg:text-base mt-0.5">{userEmail}</p>
               <div className="flex flex-wrap items-center gap-2 mt-2">
                 <span className="flex items-center gap-1.5 bg-[rgba(130,249,190,0.2)] text-[#00734c] text-xs font-medium px-3 py-1 rounded-full">
                   <svg width="11" height="11" viewBox="0 0 13 12" fill="none">
@@ -116,7 +242,7 @@ export function SettingsPage() {
                   Verified Responder
                 </span>
                 <span className="bg-[#e7e7f2] text-black text-xs font-medium px-3 py-1 rounded-full">
-                  Joined 2023
+                  {joinedYear ? `Joined ${joinedYear}` : '...'}
                 </span>
               </div>
             </div>
@@ -129,7 +255,9 @@ export function SettingsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[#e1e2ec] text-xs uppercase tracking-widest font-medium">TOTAL REPORTS</p>
-                <p className="text-[#003d9b] text-2xl font-semibold mt-1">14</p>
+                <p className="text-[#003d9b] text-2xl font-semibold mt-1">
+                  {totalReports === null ? '...' : totalReports}
+                </p>
               </div>
               <BarChart2 size={28} className="text-[#e1e2ec] opacity-80" />
             </div>
@@ -164,7 +292,12 @@ export function SettingsPage() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {locations.map((loc) => (
+          {locationsLoading && (
+            <div className="col-span-full py-8 text-center text-[#8c909f] text-sm">
+              Memuat lokasi tersimpan...
+            </div>
+          )}
+          {!locationsLoading && locations.map((loc) => (
             <div
               key={loc.id}
               className="bg-[#1d2027] border border-[rgba(255,255,255,0.08)] rounded-xl overflow-hidden"
@@ -223,18 +356,20 @@ export function SettingsPage() {
           ))}
 
           {/* Add New Location card */}
-          <button
-            onClick={openAddModal}
-            className="bg-[#1d2027] border-2 border-dashed border-[rgba(255,255,255,0.15)] rounded-xl flex flex-col items-center justify-center gap-2 p-8 hover:border-[rgba(173,198,255,0.3)] hover:bg-[rgba(173,198,255,0.03)] transition-all min-h-[180px]"
-          >
-            <div className="w-10 h-10 rounded-full bg-[rgba(255,255,255,0.06)] flex items-center justify-center">
-              <Plus size={18} className="text-[#94a3b8]" />
-            </div>
-            <div className="text-center">
-              <p className="text-[#e1e2ec] text-sm font-medium">Add New Location</p>
-              <p className="text-[#8c909f] text-xs mt-0.5">Monitor a new area</p>
-            </div>
-          </button>
+          {!locationsLoading && (
+            <button
+              onClick={openAddModal}
+              className="bg-[#1d2027] border-2 border-dashed border-[rgba(255,255,255,0.15)] rounded-xl flex flex-col items-center justify-center gap-2 p-8 hover:border-[rgba(173,198,255,0.3)] hover:bg-[rgba(173,198,255,0.03)] transition-all min-h-[180px]"
+            >
+              <div className="w-10 h-10 rounded-full bg-[rgba(255,255,255,0.06)] flex items-center justify-center">
+                <Plus size={18} className="text-[#94a3b8]" />
+              </div>
+              <div className="text-center">
+                <p className="text-[#e1e2ec] text-sm font-medium">Add New Location</p>
+                <p className="text-[#8c909f] text-xs mt-0.5">Monitor a new area</p>
+              </div>
+            </button>
+          )}
         </div>
       </div>
 
@@ -292,15 +427,56 @@ export function SettingsPage() {
               </div>
 
               {/* Address */}
-              <div>
+              <div className="relative" ref={suggestionBoxRef}>
                 <label className="block text-[#8c909f] text-xs font-medium mb-1.5 uppercase tracking-wide">Address</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Jl. Kebon Jeruk No. 12, Jakarta"
-                  value={newAddress}
-                  onChange={(e) => setNewAddress(e.target.value)}
-                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] rounded-lg px-4 py-2.5 text-[#e1e2ec] text-sm placeholder-[#8c909f] focus:outline-none focus:border-[rgba(173,198,255,0.4)] transition-colors"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="e.g. Jl. Kebon Jeruk No. 12, Jakarta"
+                    value={newAddress}
+                    onChange={(e) => handleAddressChange(e.target.value)}
+                    onFocus={() => addressSuggestions.length > 0 && setShowSuggestions(true)}
+                    autoComplete="off"
+                    className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] rounded-lg px-4 py-2.5 pr-9 text-[#e1e2ec] text-sm placeholder-[#8c909f] focus:outline-none focus:border-[rgba(173,198,255,0.4)] transition-colors"
+                  />
+                  {addressLoading && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <svg className="animate-spin h-4 w-4 text-[#8c909f]" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+
+                {newLat !== null && newLng !== null && (
+                  <p className="mt-1.5 text-[10px] text-[#4ade80] flex items-center gap-1">
+                    <MapPin size={10} />
+                    Koordinat: {newLat.toFixed(5)}, {newLng.toFixed(5)}
+                  </p>
+                )}
+                {newAddress.trim() && newLat === null && !addressLoading && (
+                  <p className="mt-1.5 text-[10px] text-[#ffb786]">
+                    Pilih alamat dari dropdown agar koordinat tersimpan
+                  </p>
+                )}
+
+                {showSuggestions && addressSuggestions.length > 0 && (
+                  <ul className="absolute z-[3000] left-0 right-0 mt-1 bg-[#252830] border border-[rgba(255,255,255,0.12)] rounded-xl overflow-hidden shadow-2xl max-h-52 overflow-y-auto">
+                    {addressSuggestions.map((s) => (
+                      <li key={s.place_id}>
+                        <button
+                          type="button"
+                          onMouseDown={(e) => { e.preventDefault(); handleSelectSuggestion(s); }}
+                          className="w-full flex items-start gap-2.5 px-4 py-2.5 text-left hover:bg-[rgba(173,198,255,0.08)] transition-colors border-b border-[rgba(255,255,255,0.05)] last:border-0"
+                        >
+                          <MapPin size={13} className="text-[#adc6ff] shrink-0 mt-0.5" />
+                          <span className="text-[#e1e2ec] text-xs leading-relaxed line-clamp-2">{s.display_name}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
 
               {/* Monitoring Radius */}
@@ -348,20 +524,25 @@ export function SettingsPage() {
               </div>
             </div>
 
+            {/* Error */}
+            {locationError && (
+              <p className="px-5 pb-2 text-[#ffb4ab] text-xs">{locationError}</p>
+            )}
+
             {/* Footer */}
             <div className="flex gap-3 px-5 pb-5">
               <button
-                onClick={() => setShowAddModal(false)}
+                onClick={() => { setShowAddModal(false); setLocationError(''); }}
                 className="flex-1 py-2.5 rounded-lg border border-[rgba(255,255,255,0.12)] text-[#e1e2ec] text-sm font-medium hover:bg-[rgba(255,255,255,0.05)] transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleAddLocation}
-                disabled={!newName.trim() || !newAddress.trim()}
+                disabled={!newName.trim() || !newAddress.trim() || addingLocation}
                 className="flex-1 py-2.5 rounded-lg bg-[#adc6ff] hover:bg-[#c7d9ff] text-[#002e6a] text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                Add Location
+                {addingLocation ? 'Menyimpan...' : 'Add Location'}
               </button>
             </div>
           </div>
@@ -447,9 +628,10 @@ export function SettingsPage() {
               </button>
               <button
                 onClick={handleSaveRadius}
-                className="flex-1 py-2.5 rounded-lg bg-[#adc6ff] hover:bg-[#c7d9ff] text-[#002e6a] text-sm font-semibold transition-colors"
+                disabled={savingRadius}
+                className="flex-1 py-2.5 rounded-lg bg-[#adc6ff] hover:bg-[#c7d9ff] text-[#002e6a] text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                Save Radius
+                {savingRadius ? 'Menyimpan...' : 'Save Radius'}
               </button>
             </div>
           </div>

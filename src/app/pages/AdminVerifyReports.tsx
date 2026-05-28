@@ -3,14 +3,15 @@ import {
   ArrowLeft,
   CheckCircle2,
   Clock,
-  Eye,
   Image,
   MapPin,
   MessageSquare,
   RefreshCw,
   XCircle,
 } from 'lucide-react';
-import { MapContainer, TileLayer, CircleMarker } from 'react-leaflet';
+import { MapContainer, CircleMarker } from 'react-leaflet';
+import { ThemedTileLayer } from '../components/ThemedTileLayer';
+import { useTheme } from '../context/ThemeContext';
 import { CommunityReport, fetchReports, updateReportStatus } from '../services/api';
 
 const rejectReasons = [
@@ -64,6 +65,8 @@ function getPhotos(report: CommunityReport) {
 }
 
 export function VerifyReports() {
+  const { theme } = useTheme();
+  const mapBackground = theme === 'light' ? '#eef2f7' : '#10131a';
   const [reports, setReports] = useState<CommunityReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -83,11 +86,14 @@ export function VerifyReports() {
     setLoading(true);
     setError('');
     try {
-      const result = await fetchReports('pending');
-      setReports(result.data || []);
+      const result = await fetchReports();
+      const filtered = (result.data || []).filter(
+        (r) => r.status === 'pending' || r.status === 'need_review'
+      );
+      setReports(filtered);
     } catch (err) {
       console.error(err);
-      setError('Gagal mengambil laporan pending. Pastikan backend dan Supabase aktif.');
+      setError('Gagal mengambil laporan. Pastikan backend dan Supabase aktif.');
     } finally {
       setLoading(false);
     }
@@ -212,12 +218,17 @@ export function VerifyReports() {
         <div className="bg-[#1d2027] border border-[rgba(255,255,255,0.08)] rounded-xl overflow-hidden">
           <div className="px-5 py-4 border-b border-[rgba(255,255,255,0.06)] flex items-start justify-between flex-wrap gap-3">
             <div>
-              <div className="flex items-center gap-2 mb-1">
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
                 <span className="text-[#8c909f] text-xs font-mono">{viewReport.id}</span>
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${sevColor[viewReport.severity] || sevColor.SEDANG}`}>
                   {viewReport.severity}
                 </span>
                 <span className={`text-xs font-semibold ${confidenceColor(confidence)}`}>Confidence: {confidence}%</span>
+                {viewReport.status === 'need_review' && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[rgba(239,68,68,0.12)] border border-[rgba(239,68,68,0.3)] text-[#ffb4ab]">
+                    ⚑ Flagged Komunitas — dilaporkan tidak akurat oleh pengguna
+                  </span>
+                )}
               </div>
               <h3 className="text-[#e1e2ec] text-lg font-bold">{viewReport.title}</h3>
               <p className="text-[#8c909f] text-xs mt-0.5 flex items-center gap-1">
@@ -280,8 +291,8 @@ export function VerifyReports() {
                 <MapPin size={12} /> Lokasi Kejadian
               </p>
               <div className="rounded-lg overflow-hidden h-[240px] border border-[rgba(255,255,255,0.08)]">
-                <MapContainer center={coords} zoom={14} zoomControl={false} style={{ height: '100%', width: '100%', background: '#10131a' }}>
-                  <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
+                <MapContainer center={coords} zoom={14} zoomControl={false} style={{ height: '100%', width: '100%', background: mapBackground }}>
+                  <ThemedTileLayer />
                   <CircleMarker center={coords} radius={10} pathOptions={{ color: '#ffb4ab', fillColor: '#ffb4ab', fillOpacity: 0.7, weight: 2 }} />
                 </MapContainer>
               </div>
@@ -330,7 +341,14 @@ export function VerifyReports() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-[#c2c6d6] text-sm">{reports.length} laporan menunggu verifikasi</p>
+        <p className="text-[#c2c6d6] text-sm">
+          {reports.length} laporan menunggu verifikasi
+          {reports.filter((r) => r.status === 'need_review').length > 0 && (
+            <span className="ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full bg-[rgba(239,68,68,0.12)] border border-[rgba(239,68,68,0.3)] text-[#ffb4ab]">
+              {reports.filter((r) => r.status === 'need_review').length} flagged komunitas
+            </span>
+          )}
+        </p>
         <button
           onClick={loadReports}
           className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#1d2027] border border-[rgba(255,255,255,0.08)] text-[#adc6ff] text-sm hover:bg-[rgba(173,198,255,0.08)]"
@@ -371,6 +389,11 @@ export function VerifyReports() {
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${sevColor[report.severity] || sevColor.SEDANG}`}>
                     {report.severity}
                   </span>
+                  {report.status === 'need_review' && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[rgba(239,68,68,0.12)] border border-[rgba(239,68,68,0.3)] text-[#ffb4ab]">
+                      ⚑ Flagged Komunitas
+                    </span>
+                  )}
                 </div>
                 <h3 className="text-[#e1e2ec] text-sm font-bold">{report.title}</h3>
                 <p className="text-[#8c909f] text-xs mt-0.5">{report.location_name || 'Lokasi belum diberi nama'}</p>
@@ -383,10 +406,11 @@ export function VerifyReports() {
               <div className="flex items-center gap-2 shrink-0">
                 <button
                   onClick={() => setViewing(report.id)}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#232733] text-[#adc6ff] hover:bg-[rgba(173,198,255,0.12)]"
+                  className="eye-button w-8 h-8 flex items-center justify-center rounded-lg bg-[var(--bg-card)] text-[var(--accent)] border border-[var(--border-soft)] hover:bg-[var(--accent-soft)] transition-colors"
                   title="Lihat detail"
+                  aria-label="Lihat detail laporan"
                 >
-                  <Eye size={14} />
+                  <Image size={14} />
                 </button>
                 <button
                   onClick={() => approve(report.id)}

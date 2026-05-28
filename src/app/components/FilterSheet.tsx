@@ -52,7 +52,7 @@ const WAKTU_OPTIONS = [
 
 const VALIDASI_OPTIONS = [
   { value: 'valid', label: 'Valid' },
-  { value: 'tidak', label: 'Tidak Valid' },
+  { value: 'tidak', label: 'Belum Valid' },
 ];
 
 interface FilterSheetProps {

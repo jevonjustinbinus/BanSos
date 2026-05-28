@@ -1,13 +1,19 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { X, Mail, CheckCircle, AlertCircle } from 'lucide-react';
 import imgDisasterReliefScene from '../../imports/LoginModernTransparentStyle-1-1/382468de2bbae8dd38eb3457dfd55ddc4e30b40c.png';
 import { supabase } from '../services/supabaseClient';
 
-type ModalType = 'none' | 'forgotPassword' | 'googleSignIn';
+type ModalType = 'none' | 'forgotPassword';
 
 export function LoginPage() {
   const navigate = useNavigate();
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data, error }) => {
+      if (!error && data.user) navigate('/dashboard', { replace: true });
+    });
+  }, [navigate]);
 
   // Form state
   const [email, setEmail] = useState('');
@@ -28,11 +34,6 @@ export function LoginPage() {
   const [resetEmail, setResetEmail] = useState('');
   const [resetEmailError, setResetEmailError] = useState('');
   const [resetSent, setResetSent] = useState(false);
-
-  // Google sign-in with email option
-  const [googleStep, setGoogleStep] = useState<'options' | 'email'>('options');
-  const [googleEmail, setGoogleEmail] = useState('');
-  const [googleEmailError, setGoogleEmailError] = useState('');
 
   const validateEmail = (val: string) =>
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
@@ -69,9 +70,13 @@ export function LoginPage() {
     setIsLoading(false);
 
     if (error) {
-      setAuthError(error.message === 'Invalid login credentials'
-        ? 'Email atau password salah.'
-        : error.message);
+      if (error.message === 'Invalid login credentials') {
+        setAuthError('Email atau password salah.');
+      } else if (error.message.toLowerCase().includes('email not confirmed')) {
+        setAuthError('Email belum diverifikasi. Cek inbox email Anda dan klik link verifikasi.');
+      } else {
+        setAuthError(error.message);
+      }
       return;
     }
 
@@ -107,43 +112,11 @@ export function LoginPage() {
     setResetSent(false);
   };
 
-  const handleGoogleContinue = async () => {
-    if (googleStep === 'options') {
-      await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: { redirectTo: `${window.location.origin}/dashboard` },
-      });
-    }
-  };
-
-  const handleGoogleEmailContinue = async () => {
-    if (!googleEmail.trim()) {
-      setGoogleEmailError('Email wajib diisi.');
-      return;
-    }
-    if (!validateEmail(googleEmail)) {
-      setGoogleEmailError('Format email tidak valid.');
-      return;
-    }
-    setGoogleEmailError('');
-
-    const { error } = await supabase.auth.signInWithOtp({
-      email: googleEmail,
-      options: { emailRedirectTo: `${window.location.origin}/dashboard` },
+  const handleGoogleSignIn = async () => {
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
     });
-
-    if (error) {
-      setGoogleEmailError(error.message);
-      return;
-    }
-    navigate('/dashboard');
-  };
-
-  const closeGoogleModal = () => {
-    setModal('none');
-    setGoogleStep('options');
-    setGoogleEmail('');
-    setGoogleEmailError('');
   };
 
   return (
@@ -329,7 +302,7 @@ export function LoginPage() {
 
               {/* Google Sign In */}
               <button
-                onClick={() => setModal('googleSignIn')}
+                onClick={handleGoogleSignIn}
                 className="w-full flex items-center justify-center gap-3 py-4 rounded-lg border border-[rgba(255,255,255,0.5)] hover:bg-[rgba(255,255,255,0.1)] transition-colors text-white text-base font-medium"
               >
                 <GoogleIcon />
@@ -449,119 +422,6 @@ export function LoginPage() {
         </div>
       )}
 
-      {/* ── Google Sign In Modal ── */}
-      {modal === 'googleSignIn' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div
-            className="w-full max-w-md rounded-2xl p-8 relative"
-            style={{
-              background: 'rgba(17, 24, 39, 0.95)',
-              border: '1px solid rgba(255,255,255,0.15)',
-              boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
-            }}
-          >
-            <button
-              onClick={closeGoogleModal}
-              className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors p-1"
-            >
-              <X size={20} />
-            </button>
-
-            {googleStep === 'options' ? (
-              <>
-                <div className="text-center mb-6">
-                  <h3 className="text-white text-xl font-semibold mb-1">Masuk ke BANSOS</h3>
-                  <p className="text-gray-400 text-sm">Pilih metode masuk</p>
-                </div>
-
-                <div className="space-y-3">
-                  {/* Google OAuth */}
-                  <button
-                    onClick={handleGoogleContinue}
-                    className="w-full flex items-center gap-4 px-5 py-4 rounded-xl border border-white/15 hover:bg-white/5 transition-colors"
-                  >
-                    <GoogleIcon />
-                    <div className="text-left">
-                      <p className="text-white font-medium text-sm">Lanjutkan dengan Google</p>
-                      <p className="text-gray-400 text-xs">Masuk menggunakan akun Google Anda</p>
-                    </div>
-                  </button>
-
-                  {/* Email option */}
-                  <button
-                    onClick={() => setGoogleStep('email')}
-                    className="w-full flex items-center gap-4 px-5 py-4 rounded-xl border border-white/15 hover:bg-white/5 transition-colors"
-                  >
-                    <div className="w-5 h-5 flex items-center justify-center">
-                      <Mail size={20} className="text-gray-300" />
-                    </div>
-                    <div className="text-left">
-                      <p className="text-white font-medium text-sm">Lanjutkan dengan Email</p>
-                      <p className="text-gray-400 text-xs">Masuk menggunakan alamat email</p>
-                    </div>
-                  </button>
-                </div>
-
-                <p className="text-gray-500 text-xs text-center mt-6">
-                  Dengan masuk, Anda menyetujui Syarat &amp; Ketentuan dan Kebijakan Privasi kami.
-                </p>
-              </>
-            ) : (
-              <>
-                <button
-                  onClick={() => {
-                    setGoogleStep('options');
-                    setGoogleEmail('');
-                    setGoogleEmailError('');
-                  }}
-                  className="flex items-center gap-2 text-gray-400 hover:text-white text-sm mb-6 transition-colors"
-                >
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                    <path d="M10 13L5 8l5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  Kembali
-                </button>
-
-                <div className="mb-6">
-                  <h3 className="text-white text-xl font-semibold mb-1">Masuk dengan Email</h3>
-                  <p className="text-gray-400 text-sm">Masukkan alamat email Anda</p>
-                </div>
-
-                <div className="space-y-1.5 mb-6">
-                  <label className="text-gray-300 text-sm font-medium block">Alamat Email</label>
-                  <input
-                    type="email"
-                    value={googleEmail}
-                    onChange={(e) => {
-                      setGoogleEmail(e.target.value);
-                      if (googleEmailError) setGoogleEmailError('');
-                    }}
-                    placeholder="contoh@email.com"
-                    className={`w-full bg-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-500 text-sm border focus:outline-none focus:ring-2 transition-all ${
-                      googleEmailError
-                        ? 'border-red-400 focus:ring-red-400/30'
-                        : 'border-white/20 focus:ring-blue-400/30'
-                    }`}
-                  />
-                  {googleEmailError && (
-                    <p className="flex items-center gap-1.5 text-red-400 text-xs mt-1">
-                      <AlertCircle size={12} className="shrink-0" />
-                      {googleEmailError}
-                    </p>
-                  )}
-                </div>
-
-                <button
-                  onClick={handleGoogleEmailContinue}
-                  className="w-full bg-[#3b82f6] hover:bg-[#2563eb] text-white font-semibold py-3 rounded-lg transition-colors text-sm"
-                >
-                  Lanjutkan
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      )}
     </>
   );
 }

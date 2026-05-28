@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router';
 import {
   LayoutDashboard,
@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import imgSystemAdministrator from '../../../imports/Dashboard-1-1/0eaa054e4d1460477cef8d1f4484a3a4900ab059.png';
 import { SupportModal } from '../SupportModal';
+import { supabase } from '../../services/supabaseClient';
 
 interface SidebarProps {
   isOpen?: boolean;
@@ -25,7 +26,7 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { label: 'Mission Control', icon: <LayoutDashboard size={18} />, path: '/dashboard' },
+  { label: 'Dashboard', icon: <LayoutDashboard size={18} />, path: '/dashboard' },
   { label: 'Incident Reports', icon: <FileText size={18} />, path: '/dashboard/reports' },
   { label: 'Risk Analysis', icon: <BarChart3 size={18} />, path: '/dashboard/risk-analysis' },
 ];
@@ -36,6 +37,17 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const [supportOpen, setSupportOpen] = useState(false);
+  const [userName, setUserName] = useState('');
+  const [userEmail, setUserEmail] = useState('');
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) {
+        setUserName(data.user.user_metadata?.full_name ?? data.user.email ?? '');
+        setUserEmail(data.user.email ?? '');
+      }
+    });
+  }, []);
 
   const isActive = (path: string) => {
     if (path === '/dashboard') return location.pathname === '/dashboard';
@@ -80,8 +92,8 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
               <img src={imgSystemAdministrator} alt="User" className="size-full object-cover" />
             </button>
             <div className="min-w-0">
-              <p className="text-[#e1e2ec] text-sm font-medium leading-tight truncate">Andi Wijaya</p>
-              <p className="text-[#8c909f] text-xs">Pengguna</p>
+              <p className="text-[#e1e2ec] text-sm font-medium leading-tight truncate">{userName || 'Pengguna'}</p>
+              <p className="text-[#8c909f] text-xs truncate">{userEmail}</p>
             </div>
           </div>
         </div>
@@ -144,7 +156,7 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
           </button>
           <button
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-[#8c909f] hover:bg-[rgba(255,255,255,0.05)] hover:text-[#e1e2ec] transition-colors"
-            onClick={() => { navigate('/'); onClose?.(); }}
+            onClick={async () => { await supabase.auth.signOut(); navigate('/'); onClose?.(); }}
           >
             <LogOut size={18} />
             Logout
