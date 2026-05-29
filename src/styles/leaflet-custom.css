@@ -1,0 +1,23 @@
+/* Leaflet map dark theme overrides */
+.leaflet-container {
+  background: #10131a;
+  font-family: 'Inter', sans-serif;
+}
+
+.leaflet-control-zoom {
+  display: none !important;
+}
+
+.leaflet-control-attribution {
+  background: rgba(16, 19, 26, 0.7) !important;
+  color: #8c909f !important;
+  font-size: 10px !important;
+}
+
+.leaflet-control-attribution a {
+  color: #adc6ff !important;
+}
+
+.leaflet-tile-pane {
+  filter: brightness(0.85) saturate(0.6);
+}
