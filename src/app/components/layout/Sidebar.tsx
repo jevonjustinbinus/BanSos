@@ -9,10 +9,12 @@ import {
   X,
   Settings,
   Lock,
+  MapPin,
 } from 'lucide-react';
 import imgSystemAdministrator from '../../../imports/Dashboard-1-1/0eaa054e4d1460477cef8d1f4484a3a4900ab059.png';
 import { SupportModal } from '../SupportModal';
 import { supabase } from '../../services/supabaseClient';
+import { fetchSavedLocations } from '../../services/api';
 
 interface SidebarProps {
   isOpen?: boolean;
@@ -39,12 +41,28 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const [supportOpen, setSupportOpen] = useState(false);
   const [userName, setUserName] = useState('');
   const [userEmail, setUserEmail] = useState('');
+  const [primaryAddress, setPrimaryAddress] = useState('');
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (data.user) {
-        setUserName(data.user.user_metadata?.full_name ?? data.user.email ?? '');
-        setUserEmail(data.user.email ?? '');
+    supabase.auth.getUser().then(async ({ data }) => {
+      if (!data.user) return;
+
+      setUserName(data.user.user_metadata?.full_name ?? data.user.email ?? '');
+      setUserEmail(data.user.email ?? '');
+
+      // Show primary address below the email in the user profile section
+      const primaryId: string | undefined = data.user.user_metadata?.primary_location_id;
+      try {
+        const result = await fetchSavedLocations(data.user.id);
+        if (result.data.length > 0) {
+          const primary =
+            (primaryId ? result.data.find((l) => l.id === primaryId) : undefined) ??
+            result.data[0];
+          // Use the short name label; fall back to a truncated address
+          setPrimaryAddress(primary.name || primary.address || '');
+        }
+      } catch {
+        // non-critical
       }
     });
   }, []);
@@ -94,6 +112,12 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
             <div className="min-w-0">
               <p className="text-[#e1e2ec] text-sm font-medium leading-tight truncate">{userName || 'Pengguna'}</p>
               <p className="text-[#8c909f] text-xs truncate">{userEmail}</p>
+              {primaryAddress && (
+                <p className="flex items-center gap-1 text-[#60a5fa] text-[10px] truncate mt-0.5">
+                  <MapPin size={9} className="shrink-0" />
+                  {primaryAddress}
+                </p>
+              )}
             </div>
           </div>
         </div>

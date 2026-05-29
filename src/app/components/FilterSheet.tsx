@@ -18,17 +18,13 @@ export const DEFAULT_FILTERS: FilterState = {
 };
 
 export const countActiveFilters = (f: FilterState) =>
-  f.categories.length +
   f.urgency.length +
   (f.radius ? 1 : 0) +
   (f.waktu ? 1 : 0) +
   (f.validasi ? 1 : 0);
 
 const CATEGORIES = [
-  { value: 'BANJIR', label: 'Banjir' },
-  { value: 'POHON TUMBANG', label: 'Pohon Tumbang' },
-  { value: 'KECELAKAAN', label: 'Kecelakaan' },
-  { value: 'KEBAKARAN', label: 'Kebakaran' },
+  { value: 'BANJIR', label: 'Banjir' }
 ];
 
 const URGENCY = [
@@ -83,7 +79,11 @@ export function FilterSheet({ open, onClose, filters, onChange }: FilterSheetPro
     onChange({ ...filters, [key]: filters[key] === val ? '' : val });
   };
 
-  const reset = () => onChange({ ...DEFAULT_FILTERS });
+const reset = () =>
+  onChange({
+    ...DEFAULT_FILTERS,
+    categories: [],
+  });
 
   if (!open) return null;
 
@@ -125,31 +125,6 @@ export function FilterSheet({ open, onClose, filters, onChange }: FilterSheetPro
 
           {/* Body */}
           <div className="flex-1 overflow-y-auto px-5 py-4 space-y-6">
-
-            {/* Kategori */}
-            <div>
-              <p className="text-[#8c909f] text-xs font-semibold uppercase tracking-widest mb-3">
-                Kategori
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {CATEGORIES.map((cat) => {
-                  const active = filters.categories.includes(cat.value);
-                  return (
-                    <button
-                      key={cat.value}
-                      onClick={() => toggleMulti('categories', cat.value)}
-                      className={`px-3 py-1.5 rounded-full text-sm border transition-all ${
-                        active
-                          ? 'bg-[rgba(173,198,255,0.15)] border-[#adc6ff] text-[#adc6ff]'
-                          : 'bg-[rgba(255,255,255,0.03)] border-[rgba(255,255,255,0.1)] text-[#c2c6d6] hover:border-[rgba(255,255,255,0.25)]'
-                      }`}
-                    >
-                      {cat.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
 
             {/* Urgensi */}
             <div>

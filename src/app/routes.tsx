@@ -41,12 +41,14 @@ import { AdminPortalPage } from './pages/AdminPortalPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { VerifyEmailPage } from './pages/VerifyEmailPage';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
+import { OnboardingPage } from './pages/OnboardingPage';
 
 export const router = createBrowserRouter([
   { path: '/', element: <LoginPage /> },
   { path: '/register', element: <RegisterPage /> },
   { path: '/verify-email', element: <VerifyEmailPage /> },
   { path: '/auth/callback', element: <AuthCallbackPage /> },
+  { path: '/onboarding', element: <ProtectedRoute><OnboardingPage /></ProtectedRoute> },
   { path: '/reset-password', element: <ResetPasswordPage /> },
   { path: '/admin/login', element: <AdminLoginPage /> },
   { path: '/admin/portal', element: <AdminGuard><AdminPortalPage /></AdminGuard> },

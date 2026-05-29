@@ -255,11 +255,11 @@ body {
   color: #ffffff !important;
 }
 
-.light [class*="bg-red"],
+/* .light [class*="bg-red"],
 .light [class*="bg-[#ef4444]"],
 .light [class*="bg-\\[\\#ef4444\\]"] {
   color: #ffffff !important;
-}
+} */
 
 .dark,
 .dark body,

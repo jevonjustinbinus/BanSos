@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   RefreshCw,
   BarChart2,
@@ -20,47 +20,18 @@ import {
 } from 'recharts';
 import {
   fetchFloodRisk,
+  fetchHourlyForecast,
   formatAlertStatus,
   type FloodRiskResponse,
+  type HourlyForecastPoint,
 } from '../services/api';
 import { getCurrentUserLocation } from '../services/location';
+import {
+  resolvePrimaryLocation,
+  DEFAULT_LAT,
+  DEFAULT_LNG,
+} from '../services/primaryLocation';
 
-// Default monitoring coordinates — Kemang, Jakarta Selatan
-const DEFAULT_LAT = -6.1233;
-const DEFAULT_LNG = 106.8317;
-
-// 48 hours of simulated data because backend does not provide time-series yet.
-// This version is influenced by current location-based risk data,
-// so the chart also changes when the user's location changes.
-const generateTrendData = (baseRainfall = 15, probability = 35) => {
-  const data = [];
-
-  const probabilityFactor = Math.min(Math.max(probability / 100, 0), 1);
-  const peakRainfall = 22 + probabilityFactor * 35;
-
-  for (let i = 0; i < 48; i++) {
-    const hour = i % 24;
-    const factor = i < 32 ? i / 32 : 1 - (i - 32) / 16;
-
-    const rainfall =
-      baseRainfall +
-      factor * peakRainfall +
-      Math.sin(i / 3) * 2 +
-      Math.random() * 2;
-
-    data.push({
-      time: `${String(hour).padStart(2, '0')}:00`,
-      index: i,
-      label:
-        i % 8 === 0
-          ? `${Math.floor(i / 24)}d ${String(hour).padStart(2, '0')}h`
-          : '',
-      rainfall: Math.max(0, Math.round(rainfall * 10) / 10),
-    });
-  }
-
-  return data;
-};
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
@@ -90,12 +61,20 @@ export function RiskAnalysisPage() {
   const [locationLoading, setLocationLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [usingUserLocation, setUsingUserLocation] = useState(false);
+
+  // Real hourly forecast from Open-Meteo
+  const [forecastData, setForecastData] = useState<HourlyForecastPoint[]>([]);
+  const [forecastLoading, setForecastLoading] = useState(false);
+  // Label shown in the subheader (e.g. "Alamat Utama" or "Lokasi GPS Anda")
+  const [activeLocationLabel, setActiveLocationLabel] = useState<string>('');
 
   const [userCoords, setUserCoords] = useState({
     lat: DEFAULT_LAT,
     lng: DEFAULT_LNG,
   });
+
+  // Controls whether the initial risk-data fetch is allowed to run
+  const [locationResolved, setLocationResolved] = useState(false);
 
   const updateCoords = useCallback((lat: number, lng: number) => {
     coordsRef.current = { lat, lng };
@@ -108,31 +87,68 @@ export function RiskAnalysisPage() {
       const targetLng = lng ?? coordsRef.current.lng;
 
       setLoading(true);
+      setForecastLoading(true);
       setError(null);
 
-      try {
-        const data = await fetchFloodRisk(targetLat, targetLng);
+      // Fetch risk data (backend) & hourly forecast (Open-Meteo) secara paralel
+      const [riskResult, forecastResult] = await Promise.allSettled([
+        fetchFloodRisk(targetLat, targetLng),
+        fetchHourlyForecast(targetLat, targetLng),
+      ]);
 
+      if (riskResult.status === 'fulfilled') {
         console.log('RISK ANALYSIS REQUEST COORDS:', {
           lat: targetLat,
           lng: targetLng,
         });
-        console.log('RISK ANALYSIS RESPONSE:', data);
-
-        setRiskData(data);
-
+        console.log('RISK ANALYSIS RESPONSE:', riskResult.value);
+        setRiskData(riskResult.value);
         // Simpan koordinat asli user/request, bukan centroid polygon backend.
         updateCoords(targetLat, targetLng);
-      } catch (err: any) {
+      } else {
+        const err = riskResult.reason as any;
         console.error('Failed to load risk data:', err);
-        setError(err.message || 'Failed to connect to backend.');
-      } finally {
-        setLoading(false);
+        setError(err?.message || 'Failed to connect to backend.');
       }
+
+      if (forecastResult.status === 'fulfilled') {
+        setForecastData(forecastResult.value);
+      } else {
+        console.warn('Failed to load hourly forecast:', forecastResult.reason);
+        setForecastData([]);
+      }
+
+      setLoading(false);
+      setForecastLoading(false);
     },
     [updateCoords]
   );
 
+  // ── Resolve primary location on mount (no GPS prompt) ────────
+  useEffect(() => {
+    resolvePrimaryLocation().then((resolved) => {
+      coordsRef.current = { lat: resolved.lat, lng: resolved.lng };
+      setUserCoords({ lat: resolved.lat, lng: resolved.lng });
+
+      if (resolved.source === 'saved' && resolved.name) {
+        setActiveLocationLabel(resolved.name);
+      } else if (resolved.source === 'session') {
+        setActiveLocationLabel('Lokasi Tersimpan');
+      } else {
+        setActiveLocationLabel('Lokasi default');
+      }
+
+      setLocationResolved(true);
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Fire risk-data fetch once the location is resolved ────────
+  useEffect(() => {
+    if (!locationResolved) return;
+    loadRiskData();
+  }, [locationResolved, loadRiskData]);
+
+  // ── Explicit GPS override button ──────────────────────────────
   const handleUseMyLocation = useCallback(async () => {
     setLocationLoading(true);
     setError(null);
@@ -140,28 +156,24 @@ export function RiskAnalysisPage() {
     try {
       const location = await getCurrentUserLocation();
 
-      setUsingUserLocation(true);
+      setActiveLocationLabel('Lokasi GPS Anda');
       await loadRiskData(location.latitude, location.longitude);
     } catch (err: any) {
       console.error('Failed to get user location:', err);
 
-      setUsingUserLocation(false);
       setError(
         err.message ||
-          'Gagal mengambil lokasi user. Menggunakan lokasi default.'
+          'Gagal mengambil lokasi GPS. Menggunakan alamat utama.'
       );
 
-      await loadRiskData(DEFAULT_LAT, DEFAULT_LNG);
+      // Fall back to primary saved address — not hardcoded Kemang
+      const fallback = await resolvePrimaryLocation();
+      setActiveLocationLabel(fallback.name ?? 'Alamat Utama');
+      await loadRiskData(fallback.lat, fallback.lng);
     } finally {
       setLocationLoading(false);
     }
   }, [loadRiskData]);
-
-  useEffect(() => {
-    // Saat user masuk Risk Analysis, langsung minta lokasi.
-    // Kalau user menolak, fallback ke lokasi default.
-    handleUseMyLocation();
-  }, [handleUseMyLocation]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -199,7 +211,8 @@ export function RiskAnalysisPage() {
   const isCriticalWater =
     alertStatus.includes('SIAGA 1') || alertStatus.includes('SIAGA 2');
 
-  const criticalThreshold = 40;
+  // 20 mm/hr = "Sangat Lebat" per klasifikasi BMKG — threshold waspada banjir
+  const criticalThreshold = 20;
 
   const waterDelta =
     waterLevel && previousWaterLevel ? waterLevel - previousWaterLevel : 0;
@@ -210,11 +223,6 @@ export function RiskAnalysisPage() {
       : waterDelta < 0
         ? `↓ ${waterDelta.toFixed(0)} cm vs sebelumnya`
         : '→ Stabil';
-
-  const trendData = useMemo(() => {
-    const baseRainfall = weatherScore * 30;
-    return generateTrendData(baseRainfall, probabilityPct);
-  }, [weatherScore, probabilityPct]);
 
   return (
     <div className="p-6 text-[#e1e2ec] space-y-6">
@@ -272,8 +280,8 @@ export function RiskAnalysisPage() {
 
           <p className="text-[#8c909f] text-xs mt-1">
             Lat {userCoords.lat.toFixed(5)} · Lng{' '}
-            {userCoords.lng.toFixed(5)} ·{' '}
-            {usingUserLocation ? 'Lokasi Anda' : 'Lokasi default'}
+            {userCoords.lng.toFixed(5)}
+            {activeLocationLabel ? ` · ${activeLocationLabel}` : ''}
           </p>
         </div>
       </div>
@@ -518,91 +526,121 @@ export function RiskAnalysisPage() {
         </div>
       )}
 
-      {/* 48-Hour Chart */}
+      {/* 48-Hour Chart — data nyata dari Open-Meteo */}
       <div className="bg-[#1d2027] border border-[rgba(255,255,255,0.06)] rounded-xl p-4 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-2 mb-5 sm:mb-6">
-          <h2 className="text-[#e1e2ec] text-base sm:text-xl font-semibold">
-            48-Hour Rainfall Trends
-          </h2>
+          <div>
+            <h2 className="text-[#e1e2ec] text-base sm:text-xl font-semibold">
+              48-Hour Rainfall Forecast
+            </h2>
+            <p className="text-[#8c909f] text-[10px] mt-0.5">
+              Prakiraan curah hujan nyata per jam · Sumber: Open-Meteo
+            </p>
+          </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            {forecastLoading && (
+              <Loader2 size={13} className="text-[#8c909f] animate-spin" />
+            )}
             <span className="px-2.5 py-1.5 rounded-lg text-xs sm:text-sm bg-[rgba(96,165,250,0.15)] border border-[#60a5fa] text-[#60a5fa] whitespace-nowrap">
-              Rainfall
+              Curah Hujan (mm/hr)
             </span>
           </div>
         </div>
 
         <div className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart
-              data={trendData}
-              margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-            >
-              <defs>
-                <linearGradient
-                  id="colorGrad-rainfall"
-                  x1="0"
-                  y1="0"
-                  x2="0"
-                  y2="1"
-                >
-                  <stop offset="5%" stopColor="#60a5fa" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#60a5fa" stopOpacity={0.02} />
-                </linearGradient>
-              </defs>
+          {forecastLoading ? (
+            /* Skeleton loading state */
+            <div className="flex items-center justify-center h-full">
+              <div className="flex flex-col items-center gap-2">
+                <Loader2 size={22} className="text-[#60a5fa] animate-spin" />
+                <p className="text-[#8c909f] text-xs">Memuat prakiraan cuaca...</p>
+              </div>
+            </div>
+          ) : forecastData.length === 0 ? (
+            /* Empty / error state */
+            <div className="flex items-center justify-center h-full">
+              <div className="flex flex-col items-center gap-2 text-center">
+                <WifiOff size={20} className="text-[#8c909f]" />
+                <p className="text-[#8c909f] text-xs">
+                  Data prakiraan tidak tersedia.<br />Periksa koneksi internet.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart
+                data={forecastData}
+                margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+              >
+                <defs>
+                  <linearGradient
+                    id="colorGrad-rainfall"
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="1"
+                  >
+                    <stop offset="5%" stopColor="#60a5fa" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#60a5fa" stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
 
-              <CartesianGrid
-                strokeDasharray="3 3"
-                stroke="rgba(255,255,255,0.04)"
-                vertical={false}
-              />
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="rgba(255,255,255,0.04)"
+                  vertical={false}
+                />
 
-              <XAxis
-                dataKey="index"
-                tick={{ fill: '#8c909f', fontSize: 11 }}
-                axisLine={false}
-                tickLine={false}
-                interval={7}
-                tickFormatter={(val: number) => trendData[val]?.label ?? ''}
-              />
+                <XAxis
+                  dataKey="index"
+                  tick={{ fill: '#8c909f', fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                  interval={7}
+                  tickFormatter={(val: number) => forecastData[val]?.label ?? ''}
+                />
 
-              <YAxis
-                tick={{ fill: '#8c909f', fontSize: 11 }}
-                axisLine={false}
-                tickLine={false}
-              />
+                <YAxis
+                  tick={{ fill: '#8c909f', fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                  unit=" mm"
+                />
 
-              <Tooltip content={<CustomTooltip />} />
+                <Tooltip content={<CustomTooltip />} />
 
-              <ReferenceLine
-                y={criticalThreshold}
-                stroke="#ef4444"
-                strokeDasharray="4 4"
-                strokeOpacity={0.5}
-                label={{
-                  value: 'CRITICAL THRESHOLD',
-                  fill: '#ef4444',
-                  fontSize: 9,
-                  position: 'insideTopLeft',
-                }}
-              />
+                <ReferenceLine
+                  y={criticalThreshold}
+                  stroke="#ef4444"
+                  strokeDasharray="4 4"
+                  strokeOpacity={0.5}
+                  label={{
+                    value: 'THRESHOLD SANGAT LEBAT (20 mm/hr)',
+                    fill: '#ef4444',
+                    fontSize: 9,
+                    position: 'insideTopLeft',
+                  }}
+                />
 
-              <Area
-                type="monotone"
-                dataKey="rainfall"
-                stroke={chartColor}
-                strokeWidth={2.5}
-                fill="url(#colorGrad-rainfall)"
-                dot={false}
-                activeDot={{
-                  r: 5,
-                  fill: chartColor,
-                  stroke: '#10131a',
-                  strokeWidth: 2,
-                }}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
+                <Area
+                  type="monotone"
+                  dataKey="rainfall"
+                  name="Curah Hujan"
+                  stroke={chartColor}
+                  strokeWidth={2.5}
+                  fill="url(#colorGrad-rainfall)"
+                  dot={false}
+                  activeDot={{
+                    r: 5,
+                    fill: chartColor,
+                    stroke: '#10131a',
+                    strokeWidth: 2,
+                  }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
 

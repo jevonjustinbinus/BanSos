@@ -8,7 +8,15 @@ import {
   updateSavedLocation,
   deleteSavedLocation,
   type SavedLocation as APISavedLocation,
+  type CommunityReport,
 } from '../services/api';
+
+import {
+  DEFAULT_LAT,
+  DEFAULT_LNG,
+  getSessionLocation,
+} from '../services/primaryLocation';
+
 import { ChevronRight, Plus, Trash2, MapPin, Bell, Shield, Database, Edit3, BarChart2, X, FileText } from 'lucide-react';
 import imgProfilePicture from '../../imports/ProfileProfessionalDarkTheme-2/05bf566309a931f21d624caab9298ae2c690b994.png';
 import imgMapView from '../../imports/ProfileProfessionalDarkTheme-2/95a1e6ef9cc5afd696639f1af1a49888c9223daf.png';
@@ -21,6 +29,53 @@ interface NominatimResult {
 }
 
 type SavedLocation = APISavedLocation;
+
+const DEFAULT_REPORT_RADIUS_KM = 5;
+
+function distanceKm(lat1: number, lng1: number, lat2: number, lng2: number) {
+  const earthRadiusKm = 6371;
+
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
+
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return earthRadiusKm * c;
+}
+
+function countNearbyReports(
+  reports: CommunityReport[],
+  lat: number,
+  lng: number,
+  radiusKm: number,
+) {
+  return reports.filter((report) => {
+    if (report.status !== 'approved') return false;
+
+    if (
+      typeof report.latitude !== 'number' ||
+      typeof report.longitude !== 'number'
+    ) {
+      return false;
+    }
+
+    const distance = distanceKm(
+      lat,
+      lng,
+      report.latitude,
+      report.longitude,
+    );
+
+    return distance <= radiusKm;
+  }).length;
+}
 
 export function SettingsPage() {
   const navigate = useNavigate();
@@ -38,6 +93,7 @@ export function SettingsPage() {
       if (!data.user) return;
 
       const uid = data.user.id;
+
       setUserId(uid);
       setUserName(data.user.user_metadata?.full_name ?? data.user.email ?? '');
       setUserEmail(data.user.email ?? '');
@@ -46,11 +102,53 @@ export function SettingsPage() {
       try {
         const [locResult, reportResult] = await Promise.allSettled([
           fetchSavedLocations(uid),
-          fetchReports(),
+          fetchReports('approved'),
         ]);
-        if (locResult.status === 'fulfilled') setLocations(locResult.value.data);
-        setTotalReports(reportResult.status === 'fulfilled' ? reportResult.value.data.length : 0);
-      } catch {
+
+        const savedLocations =
+          locResult.status === 'fulfilled' ? locResult.value.data : [];
+
+        const reports =
+          reportResult.status === 'fulfilled' ? reportResult.value.data : [];
+
+        setLocations(savedLocations);
+
+        const sessionLocation = getSessionLocation();
+
+        const primarySavedLocation = savedLocations.find(
+          (loc) =>
+            typeof loc.latitude === 'number' &&
+            typeof loc.longitude === 'number',
+        );
+
+        const activeLocation = sessionLocation
+          ? {
+              lat: sessionLocation.lat,
+              lng: sessionLocation.lng,
+              radiusKm: primarySavedLocation?.radius ?? DEFAULT_REPORT_RADIUS_KM,
+            }
+          : primarySavedLocation
+            ? {
+                lat: primarySavedLocation.latitude as number,
+                lng: primarySavedLocation.longitude as number,
+                radiusKm: primarySavedLocation.radius ?? DEFAULT_REPORT_RADIUS_KM,
+              }
+            : {
+                lat: DEFAULT_LAT,
+                lng: DEFAULT_LNG,
+                radiusKm: DEFAULT_REPORT_RADIUS_KM,
+              };
+
+        const nearbyTotal = countNearbyReports(
+          reports,
+          activeLocation.lat,
+          activeLocation.lng,
+          activeLocation.radiusKm,
+        );
+
+        setTotalReports(nearbyTotal);
+      } catch (error) {
+        console.error('Gagal mengambil data settings:', error);
         setTotalReports(0);
       } finally {
         setLocationsLoading(false);
@@ -254,7 +352,7 @@ export function SettingsPage() {
           <div className="flex flex-col gap-4 p-5 lg:p-6 h-full justify-center">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[#e1e2ec] text-xs uppercase tracking-widest font-medium">TOTAL REPORTS</p>
+                <p className="text-[#e1e2ec] text-xs uppercase tracking-widest font-medium">Laporan Sekitar</p>
                 <p className="text-[#003d9b] text-2xl font-semibold mt-1">
                   {totalReports === null ? '...' : totalReports}
                 </p>

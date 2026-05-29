@@ -343,7 +343,7 @@ export function IncidentReportsPage() {
 
   const filteredReports = useMemo(() => {
     return reportsWithDistance.filter((report) => {
-      if (filters.categories.length > 0 && !filters.categories.includes(report.category)) {
+      if (report.category !== 'BANJIR') {
         return false;
       }
 
@@ -395,10 +395,6 @@ export function IncidentReportsPage() {
   const activeCount = countActiveFilters(filters);
 
   const activeChips: { key: string; label: string }[] = [
-    ...filters.categories.map((value) => ({
-      key: `cat-${value}`,
-      label: CHIP_LABEL[value] ?? value,
-    })),
     ...filters.urgency.map((value) => ({
       key: `urg-${value}`,
       label: CHIP_LABEL[value] ?? value,
@@ -430,14 +426,7 @@ export function IncidentReportsPage() {
   ];
 
   const removeChip = (key: string) => {
-    if (key.startsWith('cat-')) {
-      const value = key.replace('cat-', '');
-
-      setFilters((current) => ({
-        ...current,
-        categories: current.categories.filter((category) => category !== value),
-      }));
-    } else if (key.startsWith('urg-')) {
+    if (key.startsWith('urg-')) {
       const value = key.replace('urg-', '');
 
       setFilters((current) => ({

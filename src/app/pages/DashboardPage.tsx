@@ -34,29 +34,14 @@ import {
 import { supabase } from '../services/supabaseClient';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { useTheme } from '../context/ThemeContext';
+import {
+  DEFAULT_LAT,
+  DEFAULT_LNG,
+  getSessionLocation as getSavedUserLocation,
+  saveSessionLocation,
+} from '../services/primaryLocation';
 
-const DEFAULT_LAT = -6.1233;
-const DEFAULT_LNG = 106.8317;
-
-const USER_LOCATION_KEY = 'bansos_user_location';
 const REPORT_RADIUS_KM = 5;
-
-function getSavedUserLocation(): { lat: number; lng: number } | null {
-  try {
-    const raw = sessionStorage.getItem(USER_LOCATION_KEY);
-    if (!raw) return null;
-
-    const parsed = JSON.parse(raw) as { lat: number; lng: number };
-
-    if (typeof parsed.lat === 'number' && typeof parsed.lng === 'number') {
-      return parsed;
-    }
-  } catch {
-    return null;
-  }
-
-  return null;
-}
 
 const userLocationIcon = L.divIcon({
   className: 'user-location-pin',
@@ -193,7 +178,7 @@ function LiveClock() {
   const wib = new Date(time.getTime() + 7 * 60 * 60 * 1000);
 
   return (
-    <span className="font-mono text-[#adc6ff] text-base lg:text-lg">
+    <span className="font-mono text-[var(--accent)] text-base font-semibold">
       {pad(wib.getUTCHours())}:{pad(wib.getUTCMinutes())}:{pad(wib.getUTCSeconds())} WIB
     </span>
   );
@@ -263,11 +248,6 @@ export function DashboardPage() {
   const navigate = useNavigate();
   const { theme } = useTheme();
 
-  const mapTileUrl =
-    theme === 'light'
-      ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
-      : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-
   const mapBackground = theme === 'light' ? '#eef2f7' : '#10131a';
 
   const coordsRef = useRef(
@@ -297,18 +277,68 @@ export function DashboardPage() {
   const [activeLocationId, setActiveLocationId] = useState<string | null>(null);
   const locDropdownRef = useRef<HTMLDivElement>(null);
 
+  // Controls whether the initial risk-data fetch is allowed to run.
+  // We delay it until we've resolved which location to use (primary vs default).
+  const [locationResolved, setLocationResolved] = useState(() => getSavedUserLocation() !== null);
+
+  // Declared BEFORE the useEffect that depends on it to avoid Temporal Dead Zone error
+  const updateCoords = useCallback((lat: number, lng: number) => {
+    coordsRef.current = { lat, lng };
+
+    setUserCoords((prev) => {
+      if (prev.lat === lat && prev.lng === lng) return prev;
+      return { lat, lng };
+    });
+  }, []);
+
   useEffect(() => {
+    const hasCachedLocation = getSavedUserLocation() !== null;
+
+    // If sessionStorage already has coords, risk-data can load immediately.
+    // We still need to fetch saved locations so the dropdown appears.
+    if (hasCachedLocation) {
+      setLocationResolved(true);
+    }
+
+    // Always fetch saved locations — needed for the "Lokasi Tersimpan" dropdown
+    // regardless of whether a session-cached location exists.
     supabase.auth.getUser().then(async ({ data }) => {
-      if (!data.user) return;
+      if (!data.user) {
+        if (!hasCachedLocation) setLocationResolved(true);
+        return;
+      }
+
+      const primaryId: string | undefined = data.user.user_metadata?.primary_location_id;
 
       try {
         const result = await fetchSavedLocations(data.user.id);
-        setSavedLocations(result.data.filter((l) => l.latitude != null && l.longitude != null));
+        const locsWithCoords = result.data.filter(
+          (l): l is SavedLocation & { latitude: number; longitude: number } =>
+            l.latitude != null && l.longitude != null,
+        );
+
+        // Always populate the dropdown list
+        setSavedLocations(locsWithCoords);
+
+        // Only override coordinates when sessionStorage has nothing
+        if (!hasCachedLocation && locsWithCoords.length > 0) {
+          const primary =
+            (primaryId ? locsWithCoords.find((l) => l.id === primaryId) : undefined) ??
+            locsWithCoords[0];
+
+          coordsRef.current = { lat: primary.latitude, lng: primary.longitude };
+          updateCoords(primary.latitude, primary.longitude);
+          setActiveLocationId(primary.id);
+          setUsingUserLocation(false);
+        }
       } catch {
-        // non-critical
+        // non-critical — fall back to coords already in coordsRef
+      } finally {
+        // Mark resolved only if we hadn't already done so above
+        if (!hasCachedLocation) setLocationResolved(true);
       }
     });
-  }, []);
+  }, [updateCoords]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -320,15 +350,6 @@ export function DashboardPage() {
     document.addEventListener('mousedown', handler);
 
     return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
-  const updateCoords = useCallback((lat: number, lng: number) => {
-    coordsRef.current = { lat, lng };
-
-    setUserCoords((prev) => {
-      if (prev.lat === lat && prev.lng === lng) return prev;
-      return { lat, lng };
-    });
   }, []);
 
   const loadRiskData = useCallback(
@@ -382,6 +403,9 @@ export function DashboardPage() {
     setUsingUserLocation(false);
     setLocationLoading(true);
 
+    // Persist the chosen location so Risk Analysis & Map pages use it too
+    saveSessionLocation(loc.latitude, loc.longitude);
+
     try {
       await loadRiskData(loc.latitude, loc.longitude);
     } finally {
@@ -399,6 +423,9 @@ export function DashboardPage() {
 
       setUsingUserLocation(true);
 
+      // Persist GPS coords so Risk Analysis & Map pages use the same location
+      saveSessionLocation(location.latitude, location.longitude);
+
       await loadRiskData(location.latitude, location.longitude);
     } catch (err: any) {
       console.error('Failed to get user location:', err);
@@ -409,15 +436,20 @@ export function DashboardPage() {
     }
   };
 
+  // Only start fetching risk data once the primary location has been resolved
   useEffect(() => {
+    if (!locationResolved) return;
+
     loadRiskData();
 
+    // Refresh setiap 10 menit — selaras dengan cache TTL di api.ts (TTL_FLOOD_RISK).
+    // Interval lebih pendek tidak akan mengirim request baru karena cache masih segar.
     const interval = window.setInterval(() => {
       loadRiskData();
-    }, 5 * 60 * 1000);
+    }, 10 * 60 * 1000);
 
     return () => window.clearInterval(interval);
-  }, [loadRiskData]);
+  }, [locationResolved, loadRiskData]);
 
   const riskPointColors: Record<string, string> = {
     high: '#ef4444',
@@ -459,10 +491,10 @@ export function DashboardPage() {
   const isHighRisk = riskLevel === 'HIGH';
 
   return (
-    <div className="p-4 lg:p-6 space-y-4 lg:space-y-6 text-[#e1e2ec]">
-      <div className="flex items-start justify-between flex-wrap gap-2">
-        <div>
-          <h1 className="text-[#e1e2ec] text-2xl lg:text-3xl font-semibold tracking-tight">
+    <div className="p-4 lg:p-6 space-y-4 lg:space-y-6 text-[var(--text-main)]">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-[var(--text-main)] text-2xl lg:text-3xl font-semibold tracking-tight">
             Dashboard
           </h1>
 
@@ -477,7 +509,7 @@ export function DashboardPage() {
               }`}
             />
 
-            <span className="text-[#c2c6d6] text-sm lg:text-base">
+            <span className="text-[var(--text-soft)] text-sm lg:text-base">
               {loading || locationLoading
                 ? 'Memuat data...'
                 : error
@@ -491,7 +523,7 @@ export function DashboardPage() {
               type="button"
               onClick={handleUseMyLocation}
               disabled={loading || locationLoading}
-              className="ml-0 lg:ml-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-[#adc6ff]/40 text-[#adc6ff] text-xs hover:bg-[rgba(173,198,255,0.12)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-strong)] px-2.5 py-1 text-xs font-medium text-[var(--accent)] transition-colors hover:bg-[var(--accent-soft)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {locationLoading ? (
                 <Loader2 size={12} className="animate-spin" />
@@ -588,21 +620,27 @@ export function DashboardPage() {
               </div>
             )}
 
-            <p className="basis-full text-[#8c909f] text-xs mt-1">
+            <p className="basis-full text-[var(--text-muted)] text-xs mt-1">
               Lat {userCoords.lat.toFixed(5)} · Lng {userCoords.lng.toFixed(5)}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <ThemeToggle />
+        <div className="flex w-full items-center justify-between gap-3 rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 py-3 shadow-sm lg:w-auto lg:justify-end lg:bg-transparent lg:border-0 lg:p-0 lg:shadow-none">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border-soft)] bg-[var(--bg-soft)] text-[var(--accent)]">
+              <CloudRain size={17} />
+            </div>
 
-          <div className="text-right">
-            <p className="text-[#8c909f] text-xs uppercase tracking-widest mb-1">
-              System Time
-            </p>
-            <LiveClock />
+            <div>
+              <p className="mb-0.5 text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">
+                System Time
+              </p>
+              <LiveClock />
+            </div>
           </div>
+
+          <ThemeToggle compact />
         </div>
       </div>
 
