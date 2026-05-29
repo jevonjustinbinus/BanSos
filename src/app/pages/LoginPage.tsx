@@ -66,7 +66,7 @@ export function LoginPage() {
     if (!valid) return;
 
     setIsLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data: signInData, error } = await supabase.auth.signInWithPassword({ email, password });
     setIsLoading(false);
 
     if (error) {
@@ -80,7 +80,9 @@ export function LoginPage() {
       return;
     }
 
-    navigate('/dashboard');
+    // First-time user → onboarding; returning user → dashboard
+    const onboarded = signInData.user?.user_metadata?.onboarding_complete;
+    navigate(onboarded ? '/dashboard' : '/onboarding');
   };
 
   const handleForgotPasswordSubmit = async () => {
