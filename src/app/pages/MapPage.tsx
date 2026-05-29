@@ -35,13 +35,9 @@ import {
 import { getCurrentUserLocation } from '../services/location';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { useTheme } from '../context/ThemeContext';
-<<<<<<< HEAD
 
 const DEFAULT_LAT = -6.2088;
 const DEFAULT_LNG = 106.8456;
-=======
-import { resolvePrimaryLocation, DEFAULT_LAT, DEFAULT_LNG } from '../services/primaryLocation';
->>>>>>> commit2-update
 const NEARBY_REPORT_RADIUS_KM = 5;
 
 const riskPointColors: Record<string, string> = {
@@ -203,13 +199,6 @@ export function MapPage() {
   });
   const [usingUserLocation, setUsingUserLocation] = useState(false);
 
-<<<<<<< HEAD
-=======
-  // Cached primary-location coords so the 60-second interval
-  // doesn't call the Supabase API on every reload.
-  const primaryCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
-
->>>>>>> commit2-update
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifList, setNotifList] = useState<MapNotification[]>([]);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -225,25 +214,14 @@ export function MapPage() {
   const [flyTarget, setFlyTarget] = useState<[number, number] | null>(null);
   const [showDropMobile, setShowDropMobile] = useState(false);
   const [showDropDesktop, setShowDropDesktop] = useState(false);
-<<<<<<< HEAD
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleMapClick = useCallback(async (lat: number, lng: number) => {
-=======
-  const debounceRef     = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const clickDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const handleMapClick = useCallback((lat: number, lng: number) => {
-    // Debounce 600 ms — mencegah spam klik memborosi API quota
-    if (clickDebounceRef.current) clearTimeout(clickDebounceRef.current);
-
->>>>>>> commit2-update
     setClickCoords([lat, lng]);
     setClickRiskLoading(true);
     setClickRiskError(null);
     setClickRiskData(null);
 
-<<<<<<< HEAD
     try {
       const data = await fetchFloodRisk(lat, lng);
       setClickRiskData(data);
@@ -252,18 +230,6 @@ export function MapPage() {
     } finally {
       setClickRiskLoading(false);
     }
-=======
-    clickDebounceRef.current = setTimeout(async () => {
-      try {
-        const data = await fetchFloodRisk(lat, lng);
-        setClickRiskData(data);
-      } catch (err: any) {
-        setClickRiskError(err.message || 'Risk query failed');
-      } finally {
-        setClickRiskLoading(false);
-      }
-    }, 600);
->>>>>>> commit2-update
   }, []);
 
   const clearClickRisk = () => {
@@ -274,21 +240,10 @@ export function MapPage() {
 
   useEffect(() => {
     const loadMapData = async () => {
-<<<<<<< HEAD
       let center = {
         lat: DEFAULT_LAT,
         lng: DEFAULT_LNG,
       };
-=======
-      // Resolve once: sessionStorage → saved locations → Jakarta defaults
-      if (!primaryCoordsRef.current) {
-        const resolved = await resolvePrimaryLocation();
-        primaryCoordsRef.current = { lat: resolved.lat, lng: resolved.lng };
-      }
-
-      // GPS takes priority when available; primary address is the fallback
-      let center = primaryCoordsRef.current;
->>>>>>> commit2-update
 
       try {
         const location = await getCurrentUserLocation();
@@ -298,18 +253,9 @@ export function MapPage() {
           lng: location.longitude,
         };
 
-<<<<<<< HEAD
         setUsingUserLocation(true);
       } catch {
         setUsingUserLocation(false);
-=======
-        // Cache the GPS coords so the interval uses them too
-        primaryCoordsRef.current = center;
-        setUsingUserLocation(true);
-      } catch {
-        setUsingUserLocation(false);
-        // center stays as primary address — not hardcoded Kemang
->>>>>>> commit2-update
       }
 
       setUserCoords(center);
@@ -378,13 +324,7 @@ export function MapPage() {
 
     loadMapData();
 
-<<<<<<< HEAD
     const interval = window.setInterval(loadMapData, 60_000);
-=======
-    // Refresh setiap 10 menit — cukup untuk data risiko/laporan,
-    // dan tidak memborosi limit 60 req/menit dari external API.
-    const interval = window.setInterval(loadMapData, 10 * 60 * 1000);
->>>>>>> commit2-update
 
     return () => window.clearInterval(interval);
   }, [usingUserLocation]);
@@ -884,11 +824,7 @@ export function MapPage() {
             {nearbyReports.length === 0 && (
               <div className="p-4 text-[var(--text-muted)] text-xs text-center">
                 Tidak ada laporan dalam radius {NEARBY_REPORT_RADIUS_KM} km dari{' '}
-<<<<<<< HEAD
                 {usingUserLocation ? 'lokasi Anda' : 'pusat Jakarta'}.
-=======
-                {usingUserLocation ? 'lokasi GPS Anda' : 'alamat utama Anda'}.
->>>>>>> commit2-update
               </div>
             )}
 
@@ -1272,11 +1208,7 @@ function NearbyReportItem({
         {typeof report.distance_km === 'number' && (
           <p className="text-[var(--accent)] text-[10px] mt-0.5">
             {report.distance_km.toFixed(2)} km dari{' '}
-<<<<<<< HEAD
             {usingUserLocation ? 'lokasi Anda' : 'pusat Jakarta'}
-=======
-            {usingUserLocation ? 'lokasi GPS Anda' : 'alamat utama Anda'}
->>>>>>> commit2-update
           </p>
         )}
       </div>

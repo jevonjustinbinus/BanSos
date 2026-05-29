@@ -1,20 +1,5 @@
 import { useState } from 'react';
-<<<<<<< HEAD
 import { Bug, ChevronRight, Flame, HeartPulse, LifeBuoy, Phone, Send, Shield, X, Zap } from 'lucide-react';
-=======
-import {
-  Bug,
-  ChevronRight,
-  Flame,
-  HeartPulse,
-  LifeBuoy,
-  Phone,
-  Send,
-  Shield,
-  X,
-  Zap,
-} from 'lucide-react';
->>>>>>> commit2-update
 
 type SupportPanelProps = {
   open: boolean;
@@ -22,57 +7,12 @@ type SupportPanelProps = {
 };
 
 const emergencyContacts = [
-<<<<<<< HEAD
   { title: 'Polisi', desc: 'Darurat kepolisian nasional', number: '110', icon: Shield, tone: 'blue' },
   { title: 'Ambulans', desc: 'Layanan darurat medis', number: '118', icon: HeartPulse, tone: 'red' },
   { title: 'Pemadam Kebakaran', desc: 'Dinas pemadam kebakaran', number: '113', icon: Flame, tone: 'orange' },
   { title: 'SAR Nasional', desc: 'Pencarian & penyelamatan', number: '115', icon: LifeBuoy, tone: 'green' },
   { title: 'BPBD Jakarta', desc: 'Badan Penanggulangan Bencana', number: '021-3458-5555', icon: Shield, tone: 'purple' },
   { title: 'PLN (Listrik)', desc: 'Gangguan listrik & kedaruratan', number: '123', icon: Zap, tone: 'yellow' },
-=======
-  {
-    title: 'Polisi',
-    desc: 'Darurat kepolisian nasional',
-    number: '110',
-    icon: Shield,
-    tone: 'blue',
-  },
-  {
-    title: 'Ambulans',
-    desc: 'Layanan darurat medis',
-    number: '118',
-    icon: HeartPulse,
-    tone: 'red',
-  },
-  {
-    title: 'Pemadam Kebakaran',
-    desc: 'Dinas pemadam kebakaran',
-    number: '113',
-    icon: Flame,
-    tone: 'orange',
-  },
-  {
-    title: 'SAR Nasional',
-    desc: 'Pencarian & penyelamatan',
-    number: '115',
-    icon: LifeBuoy,
-    tone: 'green',
-  },
-  {
-    title: 'BPBD Jakarta',
-    desc: 'Badan Penanggulangan Bencana',
-    number: '021-3458-5555',
-    icon: Shield,
-    tone: 'purple',
-  },
-  {
-    title: 'PLN (Listrik)',
-    desc: 'Gangguan listrik & kedaruratan',
-    number: '123',
-    icon: Zap,
-    tone: 'yellow',
-  },
->>>>>>> commit2-update
 ];
 
 const problemTypes = [
@@ -86,27 +26,12 @@ const problemTypes = [
 
 function toneClass(tone: string) {
   const map: Record<string, string> = {
-<<<<<<< HEAD
     blue: 'bg-blue-500/10 border-blue-500/25 text-blue-600 dark:text-blue-300',
     red: 'bg-red-500/10 border-red-500/25 text-red-600 dark:text-red-300',
     orange: 'bg-orange-500/10 border-orange-500/25 text-orange-600 dark:text-orange-300',
     green: 'bg-green-500/10 border-green-500/25 text-green-600 dark:text-green-300',
     purple: 'bg-purple-500/10 border-purple-500/25 text-purple-600 dark:text-purple-300',
     yellow: 'bg-yellow-500/10 border-yellow-500/25 text-yellow-700 dark:text-yellow-300',
-=======
-    blue:
-      'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-400/25 dark:bg-blue-400/10 dark:text-blue-300',
-    red:
-      'border-red-200 bg-red-50 text-red-700 dark:border-red-400/25 dark:bg-red-400/10 dark:text-red-300',
-    orange:
-      'border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-400/25 dark:bg-orange-400/10 dark:text-orange-300',
-    green:
-      'border-green-200 bg-green-50 text-green-700 dark:border-green-400/25 dark:bg-green-400/10 dark:text-green-300',
-    purple:
-      'border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-400/25 dark:bg-purple-400/10 dark:text-purple-300',
-    yellow:
-      'border-yellow-200 bg-yellow-50 text-yellow-700 dark:border-yellow-400/25 dark:bg-yellow-400/10 dark:text-yellow-300',
->>>>>>> commit2-update
   };
 
   return map[tone] ?? map.blue;
@@ -126,23 +51,12 @@ export function SupportPanel({ open, onClose }: SupportPanelProps) {
     <div className="fixed inset-0 z-[9999] flex justify-end bg-black/45">
       <div className="support-panel h-full w-full max-w-[430px] overflow-y-auto border-l border-[var(--border-soft)] bg-[var(--bg-card)] text-[var(--text-main)] shadow-2xl">
         <div className="flex items-center justify-between border-b border-[var(--border-soft)] px-5 py-4">
-<<<<<<< HEAD
           <h2 className="text-lg font-bold text-[var(--text-main)]">Pusat Bantuan</h2>
-=======
-          <h2 className="text-lg font-bold text-[var(--text-main)]">
-            Pusat Bantuan
-          </h2>
->>>>>>> commit2-update
 
           <button
             type="button"
             onClick={onClose}
-<<<<<<< HEAD
             className="rounded-lg p-2 text-[var(--text-muted)] hover:bg-[var(--accent-soft)] hover:text-[var(--text-main)]"
-=======
-            className="rounded-lg p-2 text-[var(--text-muted)] transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--text-main)]"
-            aria-label="Tutup pusat bantuan"
->>>>>>> commit2-update
           >
             <X size={18} />
           </button>
@@ -152,7 +66,6 @@ export function SupportPanel({ open, onClose }: SupportPanelProps) {
           <button
             type="button"
             onClick={() => setTab('emergency')}
-<<<<<<< HEAD
             className={`flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold transition-colors ${
               tab === 'emergency'
                 ? 'border-b-2 border-[var(--accent)] text-[var(--accent)]'
@@ -161,22 +74,11 @@ export function SupportPanel({ open, onClose }: SupportPanelProps) {
           >
             <Phone size={15} />
             Kontak Darurat
-=======
-            className={`flex items-center justify-center gap-2 px-3 py-3 text-sm font-semibold transition-colors ${
-              tab === 'emergency'
-                ? 'border-b-2 border-[var(--accent)] text-[var(--accent)]'
-                : 'text-[var(--text-muted)] hover:bg-[var(--accent-soft)] hover:text-[var(--text-main)]'
-            }`}
-          >
-            <Phone size={15} />
-            <span>Kontak Darurat</span>
->>>>>>> commit2-update
           </button>
 
           <button
             type="button"
             onClick={() => setTab('problem')}
-<<<<<<< HEAD
             className={`flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold transition-colors ${
               tab === 'problem'
                 ? 'border-b-2 border-[var(--accent)] text-[var(--accent)]'
@@ -185,33 +87,12 @@ export function SupportPanel({ open, onClose }: SupportPanelProps) {
           >
             <Bug size={15} />
             Laporkan Masalah
-=======
-            className={`flex items-center justify-center gap-2 px-3 py-3 text-sm font-semibold transition-colors ${
-              tab === 'problem'
-                ? 'border-b-2 border-[var(--accent)] text-[var(--accent)]'
-                : 'text-[var(--text-muted)] hover:bg-[var(--accent-soft)] hover:text-[var(--text-main)]'
-            }`}
-          >
-            <Bug size={15} />
-            <span>Laporkan Masalah</span>
->>>>>>> commit2-update
           </button>
         </div>
 
         {tab === 'emergency' ? (
           <div className="space-y-3 p-4">
-<<<<<<< HEAD
             <div className="rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-200">
-=======
-            <div
-              className="rounded-xl px-4 py-3 text-sm font-semibold leading-relaxed"
-              style={{
-                backgroundColor: '#fff5f5',
-                border: '1px solid #ffb4b4',
-                color: '#ff6b6b',
-              }}
-            >
->>>>>>> commit2-update
               Gunakan nomor darurat ini hanya pada kondisi yang mengancam jiwa atau keselamatan.
               Hubungi sesuai situasi yang tepat.
             </div>
@@ -223,38 +104,18 @@ export function SupportPanel({ open, onClose }: SupportPanelProps) {
                 <a
                   key={item.title}
                   href={`tel:${item.number}`}
-<<<<<<< HEAD
                   className={`flex items-center gap-3 rounded-xl border p-4 transition-transform hover:scale-[1.01] ${toneClass(item.tone)}`}
                 >
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-current/20 bg-current/10">
-=======
-                  className={`flex items-center gap-3 rounded-xl border p-4 transition-transform hover:scale-[1.01] ${toneClass(
-                    item.tone,
-                  )}`}
-                >
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-current/20 bg-white/40 dark:bg-current/10">
->>>>>>> commit2-update
                     <Icon size={18} />
                   </div>
 
                   <div className="min-w-0 flex-1">
-<<<<<<< HEAD
                     <p className="font-bold text-[var(--text-main)]">{item.title}</p>
                     <p className="text-xs text-[var(--text-muted)]">{item.desc}</p>
                   </div>
 
                   <div className="flex items-center gap-2 font-bold">
-=======
-                    <p className="font-bold text-[var(--text-main)]">
-                      {item.title}
-                    </p>
-                    <p className="text-xs leading-snug text-[var(--text-muted)]">
-                      {item.desc}
-                    </p>
-                  </div>
-
-                  <div className="flex shrink-0 items-center gap-1 text-sm font-bold sm:text-base">
->>>>>>> commit2-update
                     {item.number}
                     <ChevronRight size={16} />
                   </div>
@@ -279,11 +140,7 @@ export function SupportPanel({ open, onClose }: SupportPanelProps) {
                     key={type}
                     type="button"
                     onClick={() => setSelectedType(type)}
-<<<<<<< HEAD
                     className={`rounded-full px-3 py-2 text-sm transition-colors ${
-=======
-                    className={`rounded-full px-3 py-2 text-sm font-medium transition-colors ${
->>>>>>> commit2-update
                       selectedType === type
                         ? 'bg-[var(--accent)] text-[var(--text-inverse)]'
                         : 'bg-[var(--bg-soft)] text-[var(--text-soft)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]'
@@ -338,8 +195,4 @@ export function SupportPanel({ open, onClose }: SupportPanelProps) {
   );
 }
 
-<<<<<<< HEAD
 export const SupportModal = SupportPanel;
-=======
-export const SupportModal = SupportPanel;
->>>>>>> commit2-update

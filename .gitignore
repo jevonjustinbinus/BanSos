@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Logs
 logs
 *.log
@@ -40,73 +39,16 @@ bower_components
 build/Release
 
 # Dependency directories
-=======
-# =============================================================================
-# BanSos — comprehensive .gitignore
-# Frontend: React + Vite + TypeScript
-# Backend:  Python + FastAPI (bansos backend/)
-# Database: Supabase
-# =============================================================================
-
-# -----------------------------------------------------------------------------
-# Secrets & environment files (NEVER commit)
-# -----------------------------------------------------------------------------
-.env
-.env.*
-!.env.example
-!.env.template
-*.pem
-*.key
-*.p12
-secrets/
-credentials.json
-service-account*.json
-
-# Backend-specific env (folder name contains a space)
-bansos backend/.env
-bansos backend/.env.*
-
-# -----------------------------------------------------------------------------
-# Node / frontend dependencies & build output
-# -----------------------------------------------------------------------------
->>>>>>> commit2-update
 node_modules/
 jspm_packages/
 web_modules/
 
-<<<<<<< HEAD
 # Package manager stores / caches
 .npm
 .pnpm-store
 .yarn-integrity
 
 # Yarn v3
-=======
-dist/
-dist-ssr/
-build/
-out/
-.next/
-.nuxt/
-.output/
-.svelte-kit/
-**/.vitepress/dist
-**/.vitepress/cache
-.docusaurus/
-.serverless/
-
-# Vite
-.vite/
-vite.config.js.timestamp-*
-vite.config.ts.timestamp-*
-
-# TypeScript
-*.tsbuildinfo
-
-# Package manager caches
-.npm
-.pnpm-store
->>>>>>> commit2-update
 .pnp.*
 .yarn/*
 !.yarn/patches
@@ -114,26 +56,14 @@ vite.config.ts.timestamp-*
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
-<<<<<<< HEAD
 
 # TypeScript cache
 *.tsbuildinfo
-=======
-.yarn-integrity
-
-# Test / coverage (frontend)
-coverage/
-*.lcov
-.nyc_output
-lib-cov/
-.vscode-test
->>>>>>> commit2-update
 
 # Lint / formatter cache
 .eslintcache
 .stylelintcache
 
-<<<<<<< HEAD
 # Optional REPL history
 .node_repl_history
 
@@ -203,25 +133,10 @@ vite.config.ts.timestamp-*
 .vite/
 
 # Python virtual environments
-=======
-# Parcel / bundler caches
-.cache/
-.parcel-cache/
-.fusebox/
-.grunt/
-.temp/
-.temp
-
-# -----------------------------------------------------------------------------
-# Python / backend (bansos backend/)
-# -----------------------------------------------------------------------------
-# Virtual environments (any location)
->>>>>>> commit2-update
 venv/
 .venv/
 env/
 ENV/
-<<<<<<< HEAD
 
 # Python cache
 __pycache__/
@@ -229,49 +144,12 @@ __pycache__/
 *$py.class
 
 # Python test/cache tools
-=======
-env.bak/
-venv.bak/
-bansos backend/venv/
-
-# Bytecode & compiled Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-*.pyd
-*.pyo
-
-# Distribution / packaging
-.Python
-*.egg
-*.egg-info/
-.eggs/
-pip-wheel-metadata/
-pip-log.txt
-MANIFEST
-*.manifest
-*.spec
-build/
-develop-eggs/
-downloads/
-eggs/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
-.installed.cfg
-
-# Test & type-check caches
->>>>>>> commit2-update
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 .pyre/
 .tox/
 .nox/
-<<<<<<< HEAD
 
 # Python build files
 *.egg-info/
@@ -297,107 +175,3 @@ tmp/
 temp/
 *.tmp
 *.temp
-=======
-htmlcov/
-.coverage
-.coverage.*
-coverage.xml
-*.cover
-.hypothesis/
-
-# Jupyter
-.ipynb_checkpoints/
-
-# pyenv / virtualenv tools
-.python-version
-.pdm-python
-
-# -----------------------------------------------------------------------------
-# Supabase local development
-# -----------------------------------------------------------------------------
-.supabase/
-supabase/.branches/
-supabase/.temp/
-
-# -----------------------------------------------------------------------------
-# Logs & runtime
-# -----------------------------------------------------------------------------
-logs/
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
-pids/
-*.pid
-*.seed
-*.pid.lock
-
-# -----------------------------------------------------------------------------
-# OS-generated files
-# -----------------------------------------------------------------------------
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-Thumbs.db:encryptable
-Desktop.ini
-$RECYCLE.BIN/
-__MACOSX/
-
-# -----------------------------------------------------------------------------
-# Editors & IDEs
-# -----------------------------------------------------------------------------
-.vscode/*
-!.vscode/extensions.json
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-.idea/
-*.iml
-*.ipr
-*.iws
-*.swp
-*.swo
-*~
-.project
-.classpath
-.settings/
-*.sublime-project
-*.sublime-workspace
-
-# Cursor (local AI/editor state — optional to keep out of repo)
-.cursor/
-
-# -----------------------------------------------------------------------------
-# Misc temporary / local-only files
-# -----------------------------------------------------------------------------
-tmp/
-temp/
-*.tmp
-*.temp
-*.bak
-*.backup
-*.orig
-*.local
-
-# Lock-wscript / legacy
-.lock-wscript
-bower_components/
-.node_repl_history
-*.tgz
-.tern-port
-
-# DynamoDB / Firebase local
-.dynamodb/
-.firebase/
-
-# Large local data dumps (regenerate via backend scripts — uncomment if needed)
-# bansos backend/datasource/raw/
-# bansos backend/datasource/clean/
->>>>>>> commit2-update
