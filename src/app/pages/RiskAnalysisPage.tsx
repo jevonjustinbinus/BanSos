@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+=======
+import { useState, useEffect, useCallback, useRef } from 'react';
+>>>>>>> commit2-update
 import {
   RefreshCw,
   BarChart2,
@@ -20,6 +24,7 @@ import {
 } from 'recharts';
 import {
   fetchFloodRisk,
+<<<<<<< HEAD
   formatAlertStatus,
   type FloodRiskResponse,
 } from '../services/api';
@@ -61,6 +66,20 @@ const generateTrendData = (baseRainfall = 15, probability = 35) => {
 
   return data;
 };
+=======
+  fetchHourlyForecast,
+  formatAlertStatus,
+  type FloodRiskResponse,
+  type HourlyForecastPoint,
+} from '../services/api';
+import { getCurrentUserLocation } from '../services/location';
+import {
+  resolvePrimaryLocation,
+  DEFAULT_LAT,
+  DEFAULT_LNG,
+} from '../services/primaryLocation';
+
+>>>>>>> commit2-update
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
@@ -90,13 +109,28 @@ export function RiskAnalysisPage() {
   const [locationLoading, setLocationLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+<<<<<<< HEAD
   const [usingUserLocation, setUsingUserLocation] = useState(false);
+=======
+
+  // Real hourly forecast from Open-Meteo
+  const [forecastData, setForecastData] = useState<HourlyForecastPoint[]>([]);
+  const [forecastLoading, setForecastLoading] = useState(false);
+  // Label shown in the subheader (e.g. "Alamat Utama" or "Lokasi GPS Anda")
+  const [activeLocationLabel, setActiveLocationLabel] = useState<string>('');
+>>>>>>> commit2-update
 
   const [userCoords, setUserCoords] = useState({
     lat: DEFAULT_LAT,
     lng: DEFAULT_LNG,
   });
 
+<<<<<<< HEAD
+=======
+  // Controls whether the initial risk-data fetch is allowed to run
+  const [locationResolved, setLocationResolved] = useState(false);
+
+>>>>>>> commit2-update
   const updateCoords = useCallback((lat: number, lng: number) => {
     coordsRef.current = { lat, lng };
     setUserCoords({ lat, lng });
@@ -108,15 +142,29 @@ export function RiskAnalysisPage() {
       const targetLng = lng ?? coordsRef.current.lng;
 
       setLoading(true);
+<<<<<<< HEAD
       setError(null);
 
       try {
         const data = await fetchFloodRisk(targetLat, targetLng);
 
+=======
+      setForecastLoading(true);
+      setError(null);
+
+      // Fetch risk data (backend) & hourly forecast (Open-Meteo) secara paralel
+      const [riskResult, forecastResult] = await Promise.allSettled([
+        fetchFloodRisk(targetLat, targetLng),
+        fetchHourlyForecast(targetLat, targetLng),
+      ]);
+
+      if (riskResult.status === 'fulfilled') {
+>>>>>>> commit2-update
         console.log('RISK ANALYSIS REQUEST COORDS:', {
           lat: targetLat,
           lng: targetLng,
         });
+<<<<<<< HEAD
         console.log('RISK ANALYSIS RESPONSE:', data);
 
         setRiskData(data);
@@ -129,10 +177,59 @@ export function RiskAnalysisPage() {
       } finally {
         setLoading(false);
       }
+=======
+        console.log('RISK ANALYSIS RESPONSE:', riskResult.value);
+        setRiskData(riskResult.value);
+        // Simpan koordinat asli user/request, bukan centroid polygon backend.
+        updateCoords(targetLat, targetLng);
+      } else {
+        const err = riskResult.reason as any;
+        console.error('Failed to load risk data:', err);
+        setError(err?.message || 'Failed to connect to backend.');
+      }
+
+      if (forecastResult.status === 'fulfilled') {
+        setForecastData(forecastResult.value);
+      } else {
+        console.warn('Failed to load hourly forecast:', forecastResult.reason);
+        setForecastData([]);
+      }
+
+      setLoading(false);
+      setForecastLoading(false);
+>>>>>>> commit2-update
     },
     [updateCoords]
   );
 
+<<<<<<< HEAD
+=======
+  // ── Resolve primary location on mount (no GPS prompt) ────────
+  useEffect(() => {
+    resolvePrimaryLocation().then((resolved) => {
+      coordsRef.current = { lat: resolved.lat, lng: resolved.lng };
+      setUserCoords({ lat: resolved.lat, lng: resolved.lng });
+
+      if (resolved.source === 'saved' && resolved.name) {
+        setActiveLocationLabel(resolved.name);
+      } else if (resolved.source === 'session') {
+        setActiveLocationLabel('Lokasi Tersimpan');
+      } else {
+        setActiveLocationLabel('Lokasi default');
+      }
+
+      setLocationResolved(true);
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Fire risk-data fetch once the location is resolved ────────
+  useEffect(() => {
+    if (!locationResolved) return;
+    loadRiskData();
+  }, [locationResolved, loadRiskData]);
+
+  // ── Explicit GPS override button ──────────────────────────────
+>>>>>>> commit2-update
   const handleUseMyLocation = useCallback(async () => {
     setLocationLoading(true);
     setError(null);
@@ -140,11 +237,16 @@ export function RiskAnalysisPage() {
     try {
       const location = await getCurrentUserLocation();
 
+<<<<<<< HEAD
       setUsingUserLocation(true);
+=======
+      setActiveLocationLabel('Lokasi GPS Anda');
+>>>>>>> commit2-update
       await loadRiskData(location.latitude, location.longitude);
     } catch (err: any) {
       console.error('Failed to get user location:', err);
 
+<<<<<<< HEAD
       setUsingUserLocation(false);
       setError(
         err.message ||
@@ -152,17 +254,31 @@ export function RiskAnalysisPage() {
       );
 
       await loadRiskData(DEFAULT_LAT, DEFAULT_LNG);
+=======
+      setError(
+        err.message ||
+          'Gagal mengambil lokasi GPS. Menggunakan alamat utama.'
+      );
+
+      // Fall back to primary saved address — not hardcoded Kemang
+      const fallback = await resolvePrimaryLocation();
+      setActiveLocationLabel(fallback.name ?? 'Alamat Utama');
+      await loadRiskData(fallback.lat, fallback.lng);
+>>>>>>> commit2-update
     } finally {
       setLocationLoading(false);
     }
   }, [loadRiskData]);
 
+<<<<<<< HEAD
   useEffect(() => {
     // Saat user masuk Risk Analysis, langsung minta lokasi.
     // Kalau user menolak, fallback ke lokasi default.
     handleUseMyLocation();
   }, [handleUseMyLocation]);
 
+=======
+>>>>>>> commit2-update
   const handleRefresh = async () => {
     setRefreshing(true);
 
@@ -199,7 +315,12 @@ export function RiskAnalysisPage() {
   const isCriticalWater =
     alertStatus.includes('SIAGA 1') || alertStatus.includes('SIAGA 2');
 
+<<<<<<< HEAD
   const criticalThreshold = 40;
+=======
+  // 20 mm/hr = "Sangat Lebat" per klasifikasi BMKG — threshold waspada banjir
+  const criticalThreshold = 20;
+>>>>>>> commit2-update
 
   const waterDelta =
     waterLevel && previousWaterLevel ? waterLevel - previousWaterLevel : 0;
@@ -211,11 +332,14 @@ export function RiskAnalysisPage() {
         ? `↓ ${waterDelta.toFixed(0)} cm vs sebelumnya`
         : '→ Stabil';
 
+<<<<<<< HEAD
   const trendData = useMemo(() => {
     const baseRainfall = weatherScore * 30;
     return generateTrendData(baseRainfall, probabilityPct);
   }, [weatherScore, probabilityPct]);
 
+=======
+>>>>>>> commit2-update
   return (
     <div className="p-6 text-[#e1e2ec] space-y-6">
       {/* Header */}
@@ -272,8 +396,13 @@ export function RiskAnalysisPage() {
 
           <p className="text-[#8c909f] text-xs mt-1">
             Lat {userCoords.lat.toFixed(5)} · Lng{' '}
+<<<<<<< HEAD
             {userCoords.lng.toFixed(5)} ·{' '}
             {usingUserLocation ? 'Lokasi Anda' : 'Lokasi default'}
+=======
+            {userCoords.lng.toFixed(5)}
+            {activeLocationLabel ? ` · ${activeLocationLabel}` : ''}
+>>>>>>> commit2-update
           </p>
         </div>
       </div>
@@ -518,6 +647,7 @@ export function RiskAnalysisPage() {
         </div>
       )}
 
+<<<<<<< HEAD
       {/* 48-Hour Chart */}
       <div className="bg-[#1d2027] border border-[rgba(255,255,255,0.06)] rounded-xl p-4 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-2 mb-5 sm:mb-6">
@@ -528,11 +658,32 @@ export function RiskAnalysisPage() {
           <div className="flex items-center gap-2 shrink-0">
             <span className="px-2.5 py-1.5 rounded-lg text-xs sm:text-sm bg-[rgba(96,165,250,0.15)] border border-[#60a5fa] text-[#60a5fa] whitespace-nowrap">
               Rainfall
+=======
+      {/* 48-Hour Chart — data nyata dari Open-Meteo */}
+      <div className="bg-[#1d2027] border border-[rgba(255,255,255,0.06)] rounded-xl p-4 sm:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-5 sm:mb-6">
+          <div>
+            <h2 className="text-[#e1e2ec] text-base sm:text-xl font-semibold">
+              48-Hour Rainfall Forecast
+            </h2>
+            <p className="text-[#8c909f] text-[10px] mt-0.5">
+              Prakiraan curah hujan nyata per jam · Sumber: Open-Meteo
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            {forecastLoading && (
+              <Loader2 size={13} className="text-[#8c909f] animate-spin" />
+            )}
+            <span className="px-2.5 py-1.5 rounded-lg text-xs sm:text-sm bg-[rgba(96,165,250,0.15)] border border-[#60a5fa] text-[#60a5fa] whitespace-nowrap">
+              Curah Hujan (mm/hr)
+>>>>>>> commit2-update
             </span>
           </div>
         </div>
 
         <div className="h-64">
+<<<<<<< HEAD
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart
               data={trendData}
@@ -603,6 +754,100 @@ export function RiskAnalysisPage() {
               />
             </AreaChart>
           </ResponsiveContainer>
+=======
+          {forecastLoading ? (
+            /* Skeleton loading state */
+            <div className="flex items-center justify-center h-full">
+              <div className="flex flex-col items-center gap-2">
+                <Loader2 size={22} className="text-[#60a5fa] animate-spin" />
+                <p className="text-[#8c909f] text-xs">Memuat prakiraan cuaca...</p>
+              </div>
+            </div>
+          ) : forecastData.length === 0 ? (
+            /* Empty / error state */
+            <div className="flex items-center justify-center h-full">
+              <div className="flex flex-col items-center gap-2 text-center">
+                <WifiOff size={20} className="text-[#8c909f]" />
+                <p className="text-[#8c909f] text-xs">
+                  Data prakiraan tidak tersedia.<br />Periksa koneksi internet.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart
+                data={forecastData}
+                margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+              >
+                <defs>
+                  <linearGradient
+                    id="colorGrad-rainfall"
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="1"
+                  >
+                    <stop offset="5%" stopColor="#60a5fa" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#60a5fa" stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
+
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="rgba(255,255,255,0.04)"
+                  vertical={false}
+                />
+
+                <XAxis
+                  dataKey="index"
+                  tick={{ fill: '#8c909f', fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                  interval={7}
+                  tickFormatter={(val: number) => forecastData[val]?.label ?? ''}
+                />
+
+                <YAxis
+                  tick={{ fill: '#8c909f', fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                  unit=" mm"
+                />
+
+                <Tooltip content={<CustomTooltip />} />
+
+                <ReferenceLine
+                  y={criticalThreshold}
+                  stroke="#ef4444"
+                  strokeDasharray="4 4"
+                  strokeOpacity={0.5}
+                  label={{
+                    value: 'THRESHOLD SANGAT LEBAT (20 mm/hr)',
+                    fill: '#ef4444',
+                    fontSize: 9,
+                    position: 'insideTopLeft',
+                  }}
+                />
+
+                <Area
+                  type="monotone"
+                  dataKey="rainfall"
+                  name="Curah Hujan"
+                  stroke={chartColor}
+                  strokeWidth={2.5}
+                  fill="url(#colorGrad-rainfall)"
+                  dot={false}
+                  activeDot={{
+                    r: 5,
+                    fill: chartColor,
+                    stroke: '#10131a',
+                    strokeWidth: 2,
+                  }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
+>>>>>>> commit2-update
         </div>
       </div>
 

@@ -4,6 +4,67 @@
 
 const API_BASE = '/api';
 
+<<<<<<< HEAD
+=======
+// ── Request Cache (rate-limit guard) ────────────────────────────
+// External API (Open-Meteo, backend /risk) memiliki limit 60 req/menit per IP.
+// Lapisan cache ini memastikan:
+//   1. Request dengan koordinat & endpoint yang sama tidak dikirim ulang
+//      selama data masih segar (TTL belum habis).
+//   2. Request paralel untuk key yang sama hanya menghasilkan SATU network call
+//      (deduplication via in-flight map).
+
+interface CacheEntry<T> {
+  data: T;
+  expiresAt: number; // ms epoch
+}
+
+const _apiCache   = new Map<string, CacheEntry<unknown>>();
+const _inFlight   = new Map<string, Promise<unknown>>();
+
+/**
+ * Jalankan `fetcher` dengan cache + deduplication otomatis.
+ * @param key     Cache key unik, mis. "flood:-6.2088:106.8456"
+ * @param ttlMs   Lama cache valid dalam milidetik
+ * @param fetcher Fungsi async yang benar-benar memanggil API
+ */
+async function cachedFetch<T>(
+  key: string,
+  ttlMs: number,
+  fetcher: () => Promise<T>,
+): Promise<T> {
+  // 1. Kembalikan cache jika masih segar
+  const hit = _apiCache.get(key) as CacheEntry<T> | undefined;
+  if (hit && Date.now() < hit.expiresAt) return hit.data;
+
+  // 2. Request paralel → tunggu yang sedang berjalan
+  if (_inFlight.has(key)) return _inFlight.get(key) as Promise<T>;
+
+  // 3. Kirim request baru
+  const promise = fetcher()
+    .then((data) => {
+      _apiCache.set(key, { data, expiresAt: Date.now() + ttlMs });
+      _inFlight.delete(key);
+      return data;
+    })
+    .catch((err) => {
+      _inFlight.delete(key); // biarkan retry jika gagal
+      throw err;
+    });
+
+  _inFlight.set(key, promise);
+  return promise;
+}
+
+/** Bulatkan koordinat ke 4 desimal (~11 m) agar cache-hit lebih tinggi */
+const toKey = (prefix: string, lat: number, lng: number) =>
+  `${prefix}:${lat.toFixed(4)}:${lng.toFixed(4)}`;
+
+// TTL per endpoint
+const TTL_FLOOD_RISK = 10 * 60 * 1000; // 10 menit
+const TTL_FORECAST   = 30 * 60 * 1000; // 30 menit (prakiraan cuaca berubah lambat)
+
+>>>>>>> commit2-update
 // ── Flood Risk Response Types ───────────────────────────────────
 
 export interface FloodRiskLocation {
@@ -192,6 +253,7 @@ async function parseJsonResponse<T>(response: Response, fallbackMessage: string)
 // ── Risk API Functions ─────────────────────────────────────────
 
 export async function fetchFloodRisk(lat: number, lng: number): Promise<FloodRiskResponse> {
+<<<<<<< HEAD
   const response = await fetch(`${API_BASE}/risk?lat=${lat}&lng=${lng}`, {
     method: 'GET',
     headers: { Accept: 'application/json' },
@@ -204,6 +266,22 @@ export async function fetchFloodRisk(lat: number, lng: number): Promise<FloodRis
   }
 
   return data;
+=======
+  return cachedFetch(toKey('flood', lat, lng), TTL_FLOOD_RISK, async () => {
+    const response = await fetch(`${API_BASE}/risk?lat=${lat}&lng=${lng}`, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+    });
+
+    const data = await parseJsonResponse<FloodRiskResponse>(response, 'Failed to fetch flood risk');
+
+    if (!data.success) {
+      throw new Error(data.message || 'Location not found in flood risk data.');
+    }
+
+    return data;
+  });
+>>>>>>> commit2-update
 }
 
 export async function pingBackend(): Promise<boolean> {
@@ -379,6 +457,70 @@ export async function deleteSavedLocation(locationId: string): Promise<{ success
   return parseJsonResponse(response, 'Failed to delete saved location');
 }
 
+<<<<<<< HEAD
+=======
+// ── Hourly Forecast (Open-Meteo) ───────────────────────────────
+
+/**
+ * Single data-point returned by fetchHourlyForecast.
+ * `rainfall` is real accumulated precipitation in mm for that hour.
+ */
+export interface HourlyForecastPoint {
+  /** Human-readable hour label, e.g. "06:00" */
+  time: string;
+  /** Sequential index 0-47 across 48 hours */
+  index: number;
+  /** Chart axis tick label shown every 8 hours, e.g. "0d 06h" */
+  label: string;
+  /** Precipitation in mm (= mm/hr for hourly data) */
+  rainfall: number;
+}
+
+/**
+ * Fetch real 48-hour hourly precipitation forecast from Open-Meteo.
+ * Free API — no key required.
+ * Throws if the network request fails.
+ */
+export async function fetchHourlyForecast(
+  lat: number,
+  lng: number
+): Promise<HourlyForecastPoint[]> {
+  return cachedFetch(toKey('forecast', lat, lng), TTL_FORECAST, async () => {
+    const url =
+      `https://api.open-meteo.com/v1/forecast` +
+      `?latitude=${lat}&longitude=${lng}` +
+      `&hourly=precipitation` +
+      `&forecast_days=2` +
+      `&timezone=auto`;
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Gagal mengambil prakiraan cuaca: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const times: string[] = data.hourly?.time ?? [];
+    const precipitation: number[] = data.hourly?.precipitation ?? [];
+
+    return times.slice(0, 48).map((isoTime, i) => {
+      const d = new Date(isoTime);
+      const hour = d.getHours();
+      const dayNum = Math.floor(i / 24);
+      return {
+        time: `${String(hour).padStart(2, '0')}:00`,
+        index: i,
+        label: i % 8 === 0 ? `${dayNum}d ${String(hour).padStart(2, '0')}h` : '',
+        rainfall: Math.round((precipitation[i] ?? 0) * 10) / 10,
+      };
+    });
+  });
+}
+
+>>>>>>> commit2-update
 // ── Helper Formatters ───────────────────────────────────────────
 
 export function riskLevelToLabel(level: string): string {

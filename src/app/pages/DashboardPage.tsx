@@ -34,6 +34,7 @@ import {
 import { supabase } from '../services/supabaseClient';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { useTheme } from '../context/ThemeContext';
+<<<<<<< HEAD
 
 const DEFAULT_LAT = -6.1233;
 const DEFAULT_LNG = 106.8317;
@@ -58,6 +59,17 @@ function getSavedUserLocation(): { lat: number; lng: number } | null {
   return null;
 }
 
+=======
+import {
+  DEFAULT_LAT,
+  DEFAULT_LNG,
+  getSessionLocation as getSavedUserLocation,
+  saveSessionLocation,
+} from '../services/primaryLocation';
+
+const REPORT_RADIUS_KM = 5;
+
+>>>>>>> commit2-update
 const userLocationIcon = L.divIcon({
   className: 'user-location-pin',
   html: `
@@ -193,7 +205,11 @@ function LiveClock() {
   const wib = new Date(time.getTime() + 7 * 60 * 60 * 1000);
 
   return (
+<<<<<<< HEAD
     <span className="font-mono text-[#adc6ff] text-base lg:text-lg">
+=======
+    <span className="font-mono text-[var(--accent)] text-base font-semibold">
+>>>>>>> commit2-update
       {pad(wib.getUTCHours())}:{pad(wib.getUTCMinutes())}:{pad(wib.getUTCSeconds())} WIB
     </span>
   );
@@ -263,11 +279,14 @@ export function DashboardPage() {
   const navigate = useNavigate();
   const { theme } = useTheme();
 
+<<<<<<< HEAD
   const mapTileUrl =
     theme === 'light'
       ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
       : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
 
+=======
+>>>>>>> commit2-update
   const mapBackground = theme === 'light' ? '#eef2f7' : '#10131a';
 
   const coordsRef = useRef(
@@ -297,6 +316,7 @@ export function DashboardPage() {
   const [activeLocationId, setActiveLocationId] = useState<string | null>(null);
   const locDropdownRef = useRef<HTMLDivElement>(null);
 
+<<<<<<< HEAD
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
       if (!data.user) return;
@@ -309,6 +329,70 @@ export function DashboardPage() {
       }
     });
   }, []);
+=======
+  // Controls whether the initial risk-data fetch is allowed to run.
+  // We delay it until we've resolved which location to use (primary vs default).
+  const [locationResolved, setLocationResolved] = useState(() => getSavedUserLocation() !== null);
+
+  // Declared BEFORE the useEffect that depends on it to avoid Temporal Dead Zone error
+  const updateCoords = useCallback((lat: number, lng: number) => {
+    coordsRef.current = { lat, lng };
+
+    setUserCoords((prev) => {
+      if (prev.lat === lat && prev.lng === lng) return prev;
+      return { lat, lng };
+    });
+  }, []);
+
+  useEffect(() => {
+    const hasCachedLocation = getSavedUserLocation() !== null;
+
+    // If sessionStorage already has coords, risk-data can load immediately.
+    // We still need to fetch saved locations so the dropdown appears.
+    if (hasCachedLocation) {
+      setLocationResolved(true);
+    }
+
+    // Always fetch saved locations — needed for the "Lokasi Tersimpan" dropdown
+    // regardless of whether a session-cached location exists.
+    supabase.auth.getUser().then(async ({ data }) => {
+      if (!data.user) {
+        if (!hasCachedLocation) setLocationResolved(true);
+        return;
+      }
+
+      const primaryId: string | undefined = data.user.user_metadata?.primary_location_id;
+
+      try {
+        const result = await fetchSavedLocations(data.user.id);
+        const locsWithCoords = result.data.filter(
+          (l): l is SavedLocation & { latitude: number; longitude: number } =>
+            l.latitude != null && l.longitude != null,
+        );
+
+        // Always populate the dropdown list
+        setSavedLocations(locsWithCoords);
+
+        // Only override coordinates when sessionStorage has nothing
+        if (!hasCachedLocation && locsWithCoords.length > 0) {
+          const primary =
+            (primaryId ? locsWithCoords.find((l) => l.id === primaryId) : undefined) ??
+            locsWithCoords[0];
+
+          coordsRef.current = { lat: primary.latitude, lng: primary.longitude };
+          updateCoords(primary.latitude, primary.longitude);
+          setActiveLocationId(primary.id);
+          setUsingUserLocation(false);
+        }
+      } catch {
+        // non-critical — fall back to coords already in coordsRef
+      } finally {
+        // Mark resolved only if we hadn't already done so above
+        if (!hasCachedLocation) setLocationResolved(true);
+      }
+    });
+  }, [updateCoords]);
+>>>>>>> commit2-update
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -322,6 +406,7 @@ export function DashboardPage() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+<<<<<<< HEAD
   const updateCoords = useCallback((lat: number, lng: number) => {
     coordsRef.current = { lat, lng };
 
@@ -331,6 +416,8 @@ export function DashboardPage() {
     });
   }, []);
 
+=======
+>>>>>>> commit2-update
   const loadRiskData = useCallback(
     async (lat?: number, lng?: number) => {
       const targetLat = lat ?? coordsRef.current.lat;
@@ -382,6 +469,12 @@ export function DashboardPage() {
     setUsingUserLocation(false);
     setLocationLoading(true);
 
+<<<<<<< HEAD
+=======
+    // Persist the chosen location so Risk Analysis & Map pages use it too
+    saveSessionLocation(loc.latitude, loc.longitude);
+
+>>>>>>> commit2-update
     try {
       await loadRiskData(loc.latitude, loc.longitude);
     } finally {
@@ -399,6 +492,12 @@ export function DashboardPage() {
 
       setUsingUserLocation(true);
 
+<<<<<<< HEAD
+=======
+      // Persist GPS coords so Risk Analysis & Map pages use the same location
+      saveSessionLocation(location.latitude, location.longitude);
+
+>>>>>>> commit2-update
       await loadRiskData(location.latitude, location.longitude);
     } catch (err: any) {
       console.error('Failed to get user location:', err);
@@ -409,6 +508,7 @@ export function DashboardPage() {
     }
   };
 
+<<<<<<< HEAD
   useEffect(() => {
     loadRiskData();
 
@@ -418,6 +518,22 @@ export function DashboardPage() {
 
     return () => window.clearInterval(interval);
   }, [loadRiskData]);
+=======
+  // Only start fetching risk data once the primary location has been resolved
+  useEffect(() => {
+    if (!locationResolved) return;
+
+    loadRiskData();
+
+    // Refresh setiap 10 menit — selaras dengan cache TTL di api.ts (TTL_FLOOD_RISK).
+    // Interval lebih pendek tidak akan mengirim request baru karena cache masih segar.
+    const interval = window.setInterval(() => {
+      loadRiskData();
+    }, 10 * 60 * 1000);
+
+    return () => window.clearInterval(interval);
+  }, [locationResolved, loadRiskData]);
+>>>>>>> commit2-update
 
   const riskPointColors: Record<string, string> = {
     high: '#ef4444',
@@ -459,10 +575,17 @@ export function DashboardPage() {
   const isHighRisk = riskLevel === 'HIGH';
 
   return (
+<<<<<<< HEAD
     <div className="p-4 lg:p-6 space-y-4 lg:space-y-6 text-[#e1e2ec]">
       <div className="flex items-start justify-between flex-wrap gap-2">
         <div>
           <h1 className="text-[#e1e2ec] text-2xl lg:text-3xl font-semibold tracking-tight">
+=======
+    <div className="p-4 lg:p-6 space-y-4 lg:space-y-6 text-[var(--text-main)]">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-[var(--text-main)] text-2xl lg:text-3xl font-semibold tracking-tight">
+>>>>>>> commit2-update
             Dashboard
           </h1>
 
@@ -477,7 +600,11 @@ export function DashboardPage() {
               }`}
             />
 
+<<<<<<< HEAD
             <span className="text-[#c2c6d6] text-sm lg:text-base">
+=======
+            <span className="text-[var(--text-soft)] text-sm lg:text-base">
+>>>>>>> commit2-update
               {loading || locationLoading
                 ? 'Memuat data...'
                 : error
@@ -491,7 +618,11 @@ export function DashboardPage() {
               type="button"
               onClick={handleUseMyLocation}
               disabled={loading || locationLoading}
+<<<<<<< HEAD
               className="ml-0 lg:ml-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-[#adc6ff]/40 text-[#adc6ff] text-xs hover:bg-[rgba(173,198,255,0.12)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+=======
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-strong)] px-2.5 py-1 text-xs font-medium text-[var(--accent)] transition-colors hover:bg-[var(--accent-soft)] disabled:cursor-not-allowed disabled:opacity-50"
+>>>>>>> commit2-update
             >
               {locationLoading ? (
                 <Loader2 size={12} className="animate-spin" />
@@ -588,12 +719,17 @@ export function DashboardPage() {
               </div>
             )}
 
+<<<<<<< HEAD
             <p className="basis-full text-[#8c909f] text-xs mt-1">
+=======
+            <p className="basis-full text-[var(--text-muted)] text-xs mt-1">
+>>>>>>> commit2-update
               Lat {userCoords.lat.toFixed(5)} · Lng {userCoords.lng.toFixed(5)}
             </p>
           </div>
         </div>
 
+<<<<<<< HEAD
         <div className="flex items-center gap-3">
           <ThemeToggle />
 
@@ -603,6 +739,23 @@ export function DashboardPage() {
             </p>
             <LiveClock />
           </div>
+=======
+        <div className="flex w-full items-center justify-between gap-3 rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 py-3 shadow-sm lg:w-auto lg:justify-end lg:bg-transparent lg:border-0 lg:p-0 lg:shadow-none">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border-soft)] bg-[var(--bg-soft)] text-[var(--accent)]">
+              <CloudRain size={17} />
+            </div>
+
+            <div>
+              <p className="mb-0.5 text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">
+                System Time
+              </p>
+              <LiveClock />
+            </div>
+          </div>
+
+          <ThemeToggle compact />
+>>>>>>> commit2-update
         </div>
       </div>
 

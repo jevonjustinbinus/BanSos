@@ -255,11 +255,19 @@ body {
   color: #ffffff !important;
 }
 
+<<<<<<< HEAD
 .light [class*="bg-red"],
 .light [class*="bg-[#ef4444]"],
 .light [class*="bg-\\[\\#ef4444\\]"] {
   color: #ffffff !important;
 }
+=======
+/* .light [class*="bg-red"],
+.light [class*="bg-[#ef4444]"],
+.light [class*="bg-\\[\\#ef4444\\]"] {
+  color: #ffffff !important;
+} */
+>>>>>>> commit2-update
 
 .dark,
 .dark body,

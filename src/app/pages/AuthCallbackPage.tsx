@@ -11,22 +11,50 @@ export function AuthCallbackPage() {
   useEffect(() => {
     const code = new URLSearchParams(window.location.search).get('code');
 
+<<<<<<< HEAD
     if (code) {
       supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
+=======
+    /** Determines next destination after successful auth:
+     *  - First-time user  → /onboarding
+     *  - Returning user   → /dashboard
+     */
+    const getDestination = async (): Promise<string> => {
+      const { data } = await supabase.auth.getUser();
+      const complete = data.user?.user_metadata?.onboarding_complete;
+      return complete ? '/dashboard' : '/onboarding';
+    };
+
+    if (code) {
+      supabase.auth.exchangeCodeForSession(code).then(async ({ error }) => {
+>>>>>>> commit2-update
         if (error) {
           setStatus('error');
           setErrorMessage('Link verifikasi tidak valid atau sudah kadaluarsa. Silakan minta link baru.');
         } else {
           setStatus('success');
+<<<<<<< HEAD
           setTimeout(() => navigate('/dashboard', { replace: true }), 1500);
+=======
+          const dest = await getDestination();
+          setTimeout(() => navigate(dest, { replace: true }), 1500);
+>>>>>>> commit2-update
         }
       });
     } else {
       // Fallback: check if session already exists (implicit flow)
+<<<<<<< HEAD
       supabase.auth.getSession().then(({ data }) => {
         if (data.session) {
           setStatus('success');
           setTimeout(() => navigate('/dashboard', { replace: true }), 1500);
+=======
+      supabase.auth.getSession().then(async ({ data }) => {
+        if (data.session) {
+          setStatus('success');
+          const dest = await getDestination();
+          setTimeout(() => navigate(dest, { replace: true }), 1500);
+>>>>>>> commit2-update
         } else {
           setStatus('error');
           setErrorMessage('Verifikasi gagal. Link tidak valid atau sudah kadaluarsa.');

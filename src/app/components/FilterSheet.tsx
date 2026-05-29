@@ -18,17 +18,24 @@ export const DEFAULT_FILTERS: FilterState = {
 };
 
 export const countActiveFilters = (f: FilterState) =>
+<<<<<<< HEAD
   f.categories.length +
+=======
+>>>>>>> commit2-update
   f.urgency.length +
   (f.radius ? 1 : 0) +
   (f.waktu ? 1 : 0) +
   (f.validasi ? 1 : 0);
 
 const CATEGORIES = [
+<<<<<<< HEAD
   { value: 'BANJIR', label: 'Banjir' },
   { value: 'POHON TUMBANG', label: 'Pohon Tumbang' },
   { value: 'KECELAKAAN', label: 'Kecelakaan' },
   { value: 'KEBAKARAN', label: 'Kebakaran' },
+=======
+  { value: 'BANJIR', label: 'Banjir' }
+>>>>>>> commit2-update
 ];
 
 const URGENCY = [
@@ -83,7 +90,15 @@ export function FilterSheet({ open, onClose, filters, onChange }: FilterSheetPro
     onChange({ ...filters, [key]: filters[key] === val ? '' : val });
   };
 
+<<<<<<< HEAD
   const reset = () => onChange({ ...DEFAULT_FILTERS });
+=======
+const reset = () =>
+  onChange({
+    ...DEFAULT_FILTERS,
+    categories: [],
+  });
+>>>>>>> commit2-update
 
   if (!open) return null;
 
@@ -126,6 +141,7 @@ export function FilterSheet({ open, onClose, filters, onChange }: FilterSheetPro
           {/* Body */}
           <div className="flex-1 overflow-y-auto px-5 py-4 space-y-6">
 
+<<<<<<< HEAD
             {/* Kategori */}
             <div>
               <p className="text-[#8c909f] text-xs font-semibold uppercase tracking-widest mb-3">
@@ -151,6 +167,8 @@ export function FilterSheet({ open, onClose, filters, onChange }: FilterSheetPro
               </div>
             </div>
 
+=======
+>>>>>>> commit2-update
             {/* Urgensi */}
             <div>
               <p className="text-[#8c909f] text-xs font-semibold uppercase tracking-widest mb-3">
