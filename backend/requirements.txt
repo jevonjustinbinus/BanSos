@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+pandas
+geopandas
+shapely
+requests
+openpyxl
+supabase>=2.0.0
+python-dotenv
+python-multipart
