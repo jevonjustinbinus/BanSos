@@ -27,7 +27,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { mapRiskPoints } from "../data/reports";
-import imgFloodedStreet from "../../imports/BanSosImmersiveMapDashboard-1-1/eceb2ccdba1950d9889fd09510cc1f0d660cdce5.png";
+import imgFloodedStreet from "../../assets/images/flooded-street.png";
 import "../utils/leaflet-fix";
 import {
   fetchFloodRisk,

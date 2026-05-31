@@ -1,0 +1,52 @@
+.bansos-sidebar {
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border-soft);
+}
+
+.bansos-sidebar__section {
+  border-color: var(--border-soft);
+}
+
+.bansos-sidebar__nav-item {
+  border: 1px solid transparent;
+  color: var(--text-muted);
+}
+
+.bansos-sidebar__nav-item:hover {
+  background: var(--bg-soft);
+  color: var(--text-main);
+}
+
+.bansos-sidebar__nav-item[data-active='true'] {
+  background: #dbeafe;
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+}
+
+.dark .bansos-sidebar__nav-item[data-active='true'] {
+  background: #1565c0;
+  color: #ffffff;
+  border-color: transparent;
+}
+
+.bansos-sidebar__admin {
+  background: rgba(59, 130, 246, 0.06);
+  border: 1px solid rgba(59, 130, 246, 0.18);
+  color: #2563eb;
+}
+
+.dark .bansos-sidebar__admin {
+  background: rgba(173, 198, 255, 0.05);
+  border-color: rgba(173, 198, 255, 0.1);
+  color: #adc6ff;
+}
+
+.bansos-sidebar__avatar {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.dark .bansos-sidebar__avatar {
+  background: #1d2027;
+  color: #adc6ff;
+}

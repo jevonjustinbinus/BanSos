@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { AlertCircle } from 'lucide-react';
-import imgDisasterReliefScene from '../../imports/RegisterModernTransparentStyle-1-1/382468de2bbae8dd38eb3457dfd55ddc4e30b40c.png';
+import imgDisasterReliefScene from '../../assets/images/disaster-relief-scene.png';
 import { supabase } from '../services/supabaseClient';
 
 type PageState = 'loading' | 'form' | 'success' | 'invalid';

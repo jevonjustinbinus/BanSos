@@ -537,8 +537,8 @@ export function CreateReportPage() {
   return (
     <div className="min-h-screen bg-[var(--bg-main)] text-[var(--text-main)]">
       <div
-        className="sticky top-0 z-50 h-16 flex items-center gap-3 px-4 sm:px-6 backdrop-blur-xl border-b border-[rgba(255,255,255,0.05)]"
-        style={{ background: 'rgba(11,14,21,0.8)' }}
+        className="sticky top-0 z-50 h-16 flex items-center gap-3 px-4 sm:px-6 backdrop-blur-sm border-b border-[rgba(255,255,255,0.5)]"
+        style={{ background: 'rgba(240,240,240,0.5)' }}
       >
         <button
           onClick={() => navigate(-1)}
@@ -548,8 +548,8 @@ export function CreateReportPage() {
           Back
         </button>
 
-        <h1 className="text-[#adc6ff] text-lg sm:text-2xl font-semibold truncate">
-          Incident Report
+        <h1 className="text-[#4d7ff2] text-lg sm:text-2xl font-semibold truncate">
+          Laporkan Kejadian
         </h1>
       </div>
 
@@ -653,13 +653,13 @@ export function CreateReportPage() {
                 />
               </svg>
 
-              <h2 className="text-[#e1e2ec] text-2xl font-semibold">Incident Details</h2>
+              <h2 className="text-[#e1e2ec] text-2xl font-semibold">Detail Kejadian</h2>
             </div>
 
             <div className="p-6 space-y-5">
               <div className="space-y-2">
                 <label className="block text-[#c2c6d6] text-xs uppercase tracking-widest font-semibold">
-                  Report Title
+                  Judul Laporan
                 </label>
 
                 <input
@@ -669,7 +669,7 @@ export function CreateReportPage() {
                     setTitle(e.target.value);
                     setFieldErrors((prev) => ({ ...prev, title: undefined }));
                   }}
-                  placeholder="e.g., Banjir di Jalan Kemang Raya"
+                  placeholder="e.g., Banjir di Halte Bus Pejompongan"
                   className={`w-full bg-[#32353c] border rounded-lg px-4 py-4 text-[#e1e2ec] placeholder-[#8c909f] text-base focus:outline-none focus:ring-1 transition-colors ${
                     fieldErrors.title
                       ? 'border-[#ef4444] focus:border-[#ef4444] focus:ring-[rgba(239,68,68,0.2)]'
@@ -684,7 +684,7 @@ export function CreateReportPage() {
 
               <div className="space-y-2">
                 <label className="block text-[#c2c6d6] text-xs uppercase tracking-widest font-semibold">
-                  Detailed Description
+                  Deskripsi
                 </label>
 
                 <textarea
@@ -709,7 +709,7 @@ export function CreateReportPage() {
 
               <div className="space-y-2">
                 <label className="block text-[#c2c6d6] text-xs uppercase tracking-widest font-semibold">
-                  Severity Level
+                  Tingkat Keparahan
                 </label>
 
                 <div className="grid grid-cols-3 gap-2 sm:gap-3">
@@ -746,7 +746,7 @@ export function CreateReportPage() {
             <div className="flex items-center justify-between px-6 py-4 border-b border-[rgba(255,255,255,0.05)]">
               <div className="flex items-center gap-3">
                 <MapPin size={16} className="text-[#adc6ff]" />
-                <h2 className="text-[#e1e2ec] text-2xl font-semibold">Location & Coordination</h2>
+                <h2 className="text-[#e1e2ec] text-2xl font-semibold">Lokasi</h2>
               </div>
 
               <button
@@ -865,7 +865,7 @@ export function CreateReportPage() {
           <div className="bg-[#1d2027] border border-[rgba(255,255,255,0.08)] rounded-xl overflow-hidden">
             <div className="flex items-center gap-3 px-6 py-4 border-b border-[rgba(255,255,255,0.05)]">
               <Upload size={16} className="text-[#adc6ff]" />
-              <h2 className="text-[#e1e2ec] text-2xl font-semibold">Evidence Photo / Video</h2>
+              <h2 className="text-[#e1e2ec] text-2xl font-semibold">Bukti Foto / Video</h2>
             </div>
 
             <div className="p-6 space-y-4">

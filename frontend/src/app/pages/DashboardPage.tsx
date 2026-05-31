@@ -39,6 +39,7 @@ import {
   DEFAULT_LNG,
   getSessionLocation as getSavedUserLocation,
   saveSessionLocation,
+  saveSessionLocationName,
 } from '../services/primaryLocation';
 
 const REPORT_RADIUS_KM = 5;
@@ -185,10 +186,17 @@ function LiveClock() {
 }
 
 const severityBg: Record<string, string> = {
-  KRITIS: 'bg-[#93000a] text-[#ffdad6]',
-  SEDANG: 'bg-[#5c3c00] text-[#ffb786]',
-  RENDAH: 'bg-[#002105] text-[#7dd878]',
-  PERINGATAN: 'bg-[#5c3c00] text-[#ffb786]',
+  KRITIS:
+    'bg-red-200/40 text-red-500 border border-red-100 dark:bg-[#93000a] dark:text-[#ffdad6] dark:border-[rgba(255,218,214,0.2)]',
+
+  SEDANG:
+    'bg-amber-200/40 text-amber-600 border border-amber-100 dark:bg-[#5c3c00] dark:text-[#ffb786] dark:border-[rgba(255,183,134,0.2)]',
+
+  RENDAH:
+    'bg-emerald-200/40 text-emerald-600 border border-emerald-100 dark:bg-[#002105] dark:text-[#7dd878] dark:border-[rgba(125,216,120,0.2)]',
+
+  PERINGATAN:
+    'bg-amber-200/40 text-amber-600 border border-amber-100 dark:bg-[#5c3c00] dark:text-[#ffb786] dark:border-[rgba(255,183,134,0.2)]',
 };
 
 function getWaterLevelLabel(alertStatus?: string | null) {
@@ -215,33 +223,56 @@ function getWaterLevelLabel(alertStatus?: string | null) {
 
 function getWaterLevelBadgeClass(label: string) {
   if (label === 'BAHAYA') {
-    return 'bg-[#93000a] text-[#ffdad6] border border-[rgba(255,180,171,0.25)]';
+    return 'bg-red-200 text-red-700 border border-red-100 dark:bg-[#93000a] dark:text-[#ffdad6] dark:border-[rgba(255,180,171,0.25)]';
   }
 
   if (label === 'SIAGA') {
-    return 'bg-[#5c3c00] text-[#ffb786] border border-[rgba(255,183,134,0.25)]';
+    return 'bg-amber-200 text-amber-600 border border-amber-100 dark:bg-[#5d3c00] dark:text-[#ffb786] dark:border-[rgba(255,183,134,0.25)]';
   }
 
-  return 'bg-[#002105] text-[#7dd878] border border-[rgba(125,216,120,0.25)]';
+  return "bg-emerald-200 text-emerald-700 border border-emerald-100 dark:bg-[#026511] dark:text-[#7df777] dark:border-[rgba(125,216,120,0.25)]";
 }
 
 function getWaterLevelTextColor(label: string) {
-  if (label === 'BAHAYA') return 'text-[#ffb4ab]';
-  if (label === 'SIAGA') return 'text-[#ffb786]';
-  return 'text-[#e1e2ec]';
+  if (label === 'BAHAYA') {
+    return 'text-red-500 dark:text-red-600';
+  }
+
+  if (label === 'SIAGA') {
+    return 'text-amber-500 dark:text-amber-700]';
+  }
+
+  return 'text-blue-900 dark:text-[#e1e2ec]';
 }
 
 function formatWaterAlertStatus(alertStatus?: string | null) {
   const status = alertStatus?.toUpperCase() ?? '';
 
-  if (status.includes('SIAGA 1')) return 'Siaga 1 — Bahaya';
-  if (status.includes('SIAGA 2')) return 'Siaga 2 — Waspada';
-  if (status.includes('SIAGA 3')) return 'Siaga 3 — Siaga';
-  if (status.includes('BAHAYA')) return 'Bahaya';
-  if (status.includes('WASPADA')) return 'Waspada';
-  if (status.includes('NORMAL') || status.includes('AMAN')) return 'Normal';
+  if (status.includes('SIAGA 1')) {
+    return 'Bahaya — potensi banjir tinggi';
+  }
 
-  return alertStatus || 'Data dari sensor/pos air terdekat.';
+  if (status.includes('SIAGA 2')) {
+    return 'Waspada — tinggi air meningkat';
+  }
+
+  if (status.includes('SIAGA 3')) {
+    return 'Siaga — perlu dipantau';
+  }
+
+  if (status.includes('BAHAYA')) {
+    return 'Bahaya — segera waspada';
+  }
+
+  if (status.includes('WASPADA')) {
+    return 'Waspada — pantau kondisi air';
+  }
+
+  if (status.includes('NORMAL') || status.includes('AMAN')) {
+    return 'Air dalam batas aman';
+  }
+
+  return 'Status air belum tersedia';
 }
 
 export function DashboardPage() {
@@ -264,7 +295,6 @@ export function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [locationLoading, setLocationLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [locationError, setLocationError] = useState<string | null>(null);
 
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number }>(() => {
     const saved = getSavedUserLocation();
@@ -413,7 +443,8 @@ export function DashboardPage() {
 
     // Persist the chosen location so Risk Analysis & Map pages use it too
     saveSessionLocation(loc.latitude, loc.longitude);
-      window.dispatchEvent(new Event('bansos-location-updated'));
+    saveSessionLocationName(loc.name ?? loc.address ?? 'Lokasi Tersimpan');
+    window.dispatchEvent(new Event('bansos-location-updated'));
 
       try {
         await loadRiskData(loc.latitude, loc.longitude);
@@ -426,7 +457,6 @@ export function DashboardPage() {
     setLocationLoading(true);
     setActiveLocationId(null);
     setError(null);
-    setLocationError(null);
 
     try {
       const location = await getCurrentUserLocation();
@@ -435,15 +465,14 @@ export function DashboardPage() {
 
       // Persist GPS coords so Risk Analysis & Map pages use the same location
       saveSessionLocation(location.latitude, location.longitude);
+      saveSessionLocationName('Lokasi GPS Anda');
       window.dispatchEvent(new Event('bansos-location-updated'));
 
       await loadRiskData(location.latitude, location.longitude);
     } catch (err: any) {
       console.error('Failed to get user location:', err);
       setUsingUserLocation(false);
-      setLocationError(err.message || 'Gagal mengambil lokasi.');
-      // Fall back to existing saved/default coords — page stays functional
-      await loadRiskData();
+      setError(err.message || 'Gagal mengambil lokasi user.');
     } finally {
       setLocationLoading(false);
     }
@@ -688,24 +717,6 @@ export function DashboardPage() {
         </div>
       )}
 
-      {locationError && !error && (
-        <div className="flex items-center justify-between gap-3 p-3 rounded-xl bg-[rgba(255,183,134,0.08)] border border-[rgba(255,183,134,0.25)]">
-          <div className="flex items-center gap-2">
-            <MapPin size={15} className="text-[#ffb786] shrink-0" />
-            <p className="text-[#ffb786] text-xs lg:text-sm">
-              {locationError} — Menampilkan data untuk lokasi tersimpan.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setLocationError(null)}
-            className="text-[#8c909f] hover:text-[#e1e2ec] text-xs shrink-0 transition-colors"
-          >
-            ✕
-          </button>
-        </div>
-      )}
-
       {waterFreshnessWarning && !loading && !error && (
         <div className="flex items-start gap-3 p-4 rounded-xl bg-[rgba(92,60,0,0.25)] border border-[rgba(255,183,134,0.25)]">
           <AlertTriangle size={18} className="text-[#ffb786] mt-0.5 shrink-0" />
@@ -770,7 +781,7 @@ export function DashboardPage() {
         <div className="bg-[#1d2027] border border-[rgba(255,255,255,0.06)] rounded-xl p-3 lg:p-4">
           <div className="flex items-center justify-between mb-2">
             <p className="text-[#8c909f] text-[10px] lg:text-xs uppercase tracking-widest">
-              Level Risiko
+              Level Risiko Banjir
             </p>
 
             {loading ? (
@@ -801,7 +812,7 @@ export function DashboardPage() {
         <div className="bg-[#1d2027] border border-[rgba(255,255,255,0.06)] rounded-xl p-3 lg:p-4">
           <div className="flex items-center justify-between mb-2">
             <p className="text-[#8c909f] text-[10px] lg:text-xs uppercase tracking-widest">
-              Tren Risiko
+              Tren Risiko Banjir
             </p>
 
             {loading ? (
@@ -823,7 +834,7 @@ export function DashboardPage() {
         <div className="bg-[#1d2027] border border-[rgba(255,255,255,0.06)] rounded-xl p-3 lg:p-4">
           <div className="flex items-center justify-between mb-2">
             <p className="text-[#8c909f] text-[10px] lg:text-xs uppercase tracking-widest">
-              Cuaca Aktif
+              Prediksi Hujan
             </p>
 
             {loading ? (
@@ -854,7 +865,7 @@ export function DashboardPage() {
               </p>
 
               <p className="text-slate-600 text-xs mt-1 dark:text-[#8c909f]">
-                Berdasarkan laporan incident di sekitar lokasi aktif
+                Berdasarkan laporan incident di sekitar lokasi Anda
               </p>
             </div>
 
@@ -879,7 +890,7 @@ export function DashboardPage() {
             {loading
               ? ''
               : waterDistance !== undefined
-                ? `Jarak sekitar ${waterDistance.toFixed(2)} km dari lokasi monitoring`
+                ? `Jarak sekitar ${waterDistance.toFixed(2)} km dari lokasi Anda`
                 : 'Jarak tidak tersedia'}
           </p>
         </div>
@@ -926,7 +937,7 @@ export function DashboardPage() {
               <div className="w-2 h-2 bg-[#adc6ff] rounded-full animate-pulse" />
 
               <span className="text-[#8c909f] text-xs uppercase tracking-widest font-semibold">
-                Jakarta Tactical Grid
+                Peta Jakarta
               </span>
             </div>
 
@@ -1045,7 +1056,7 @@ export function DashboardPage() {
               <FileText size={14} className="text-[#adc6ff]" />
 
               <span className="text-[#e1e2ec] text-sm font-semibold uppercase tracking-wide">
-                Recent Activity
+                Update Terbaru
               </span>
             </div>
 
@@ -1054,7 +1065,7 @@ export function DashboardPage() {
               onClick={() => navigate('/dashboard/reports')}
               className="text-[#adc6ff] text-xs hover:underline"
             >
-              View Log
+              See More
             </button>
           </div>
 
