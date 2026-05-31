@@ -1,7 +1,7 @@
 # =============================================================================
 # BanSos — comprehensive .gitignore
 # Frontend: React + Vite + TypeScript
-# Backend:  Python + FastAPI (bansos backend/)
+# Backend:  Python + FastAPI
 # Database: Supabase
 # =============================================================================
 
@@ -9,7 +9,7 @@
 # Secrets & environment files (NEVER commit)
 # -----------------------------------------------------------------------------
 .env
-.env.*
+.env.*git status
 !.env.example
 !.env.template
 *.pem
@@ -19,7 +19,15 @@ secrets/
 credentials.json
 service-account*.json
 
-# Backend-specific env (folder name contains a space)
+# Frontend-specific env
+frontend/.env
+frontend/.env.*
+
+# Backend-specific env
+backend/.env
+backend/.env.*
+
+# Legacy backend-specific env, if old folder name still exists
 bansos backend/.env
 bansos backend/.env.*
 
@@ -42,6 +50,11 @@ out/
 **/.vitepress/cache
 .docusaurus/
 .serverless/
+
+# Frontend-specific generated files
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
 
 # Vite
 .vite/
@@ -83,7 +96,7 @@ lib-cov/
 .temp
 
 # -----------------------------------------------------------------------------
-# Python / backend (bansos backend/)
+# Python / backend
 # -----------------------------------------------------------------------------
 # Virtual environments (any location)
 venv/
@@ -92,10 +105,17 @@ env/
 ENV/
 env.bak/
 venv.bak/
+
+# Backend-specific virtual environments
+backend/venv/
+backend/.venv/
+
+# Legacy backend-specific virtual environment, if old folder name still exists
 bansos backend/venv/
 
 # Bytecode & compiled Python
 __pycache__/
+backend/__pycache__/
 *.py[cod]
 *$py.class
 *.so
@@ -203,12 +223,7 @@ __MACOSX/
 *.sublime-project
 *.sublime-workspace
 
-# Cursor (local AI/editor state — optional to keep out of repo)
-.cursor/
-
-# -----------------------------------------------------------------------------
 # Misc temporary / local-only files
-# -----------------------------------------------------------------------------
 tmp/
 temp/
 *.tmp
@@ -228,7 +243,3 @@ bower_components/
 # DynamoDB / Firebase local
 .dynamodb/
 .firebase/
-
-# Large local data dumps (regenerate via backend scripts — uncomment if needed)
-# bansos backend/datasource/raw/
-# bansos backend/datasource/clean/
