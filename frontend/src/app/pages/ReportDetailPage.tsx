@@ -21,7 +21,7 @@ import {
 } from '../services/api';
 import { supabase } from '../services/supabaseClient';
 import { MapContainer, TileLayer, CircleMarker, useMap } from 'react-leaflet';
-import imgFloodDamage from '../../imports/ReportDetailProfessionalDarkTheme-1-1/e63331a1de007fe4f014f49a2054fad1ec65d562.png';
+import imgFloodDamage from '../../assets/images/flood-damage.png';
 import '../utils/leaflet-fix';
 
 function MapResizer() {

@@ -246,14 +246,13 @@ export function MyReportsPage() {
                 </div>
               </div>
 
-              <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 dark:border-[rgba(173,198,255,0.16)] dark:bg-[rgba(173,198,255,0.06)]">
+              <div className="w-full max-w-xl rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 dark:border-[rgba(173,198,255,0.16)] dark:bg-[rgba(173,198,255,0.06)]">
                 <p className="text-xs font-semibold text-blue-700 dark:text-[#adc6ff]">
-                  Formula rating
+                  Cara rating dihitung
                 </p>
-
                 <p className="mt-1 text-xs leading-relaxed text-slate-600 dark:text-[#8c909f]">
-                  Rating = laporan verified ÷ laporan verified/rejected × 5.
-                  Laporan pending belum dihitung.
+                  Rating kamu naik ketika laporan yang kamu kirim terbukti valid oleh admin.
+                  Laporan yang ditolak akan menurunkan nilai, sedangkan laporan yang masih menunggu pengecekan belum memengaruhi rating.
                 </p>
               </div>
             </div>
@@ -362,9 +361,12 @@ export function MyReportsPage() {
                     String(media.media_type).startsWith('image') ||
                     media.media_type === 'image',
                 );
-
                 const firstVideo = !firstImage
-                  ? report.report_media?.find((media) => media.media_type === 'video')
+                  ? report.report_media?.find(
+                      (media) =>
+                        String(media.media_type).startsWith('video') ||
+                        media.media_type === 'video',
+                    )
                   : undefined;
 
                 return (
@@ -386,9 +388,8 @@ export function MyReportsPage() {
                           <video
                             src={firstVideo.media_url}
                             className="h-full w-full object-cover"
-                            preload="metadata"
                             muted
-                            playsInline
+                            preload="metadata"
                           />
                         ) : (
                           <div className="flex h-full w-full items-center justify-center">

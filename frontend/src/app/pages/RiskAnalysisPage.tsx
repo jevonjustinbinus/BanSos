@@ -3,12 +3,12 @@ import {
   useEffect,
   useCallback,
   useRef,
-  type ChangeEvent,
 } from "react";
 import { useLocation } from "react-router";
 import {
   RefreshCw,
   BarChart2,
+  BookMarked,
   Droplets,
   Wind,
   Loader2,
@@ -41,6 +41,7 @@ import {
   resolvePrimaryLocation,
   getSessionLocation,
   saveSessionLocation,
+  saveSessionLocationName,
   DEFAULT_LAT,
   DEFAULT_LNG,
 } from "../services/primaryLocation";
@@ -58,17 +59,20 @@ const isSameCoordinate = (
   lngB: number,
 ) => Math.abs(latA - latB) < 0.0001 && Math.abs(lngA - lngB) < 0.0001;
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+const CustomTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
-    const time: string = payload[0]?.payload?.time ?? String(label);
+    const point = payload[0]?.payload;
+    const timeLabel = point?.time ?? "Waktu tidak tersedia";
+    const rainfall = Number(point?.rainfall ?? 0);
+
     return (
-      <div className="bg-[#1d2027] border border-[rgba(255,255,255,0.1)] rounded-lg px-3 py-2 text-xs">
-        <p className="text-[#8c909f] mb-1">{time}</p>
-        {payload.map((p: any) => (
-          <p key={p.name} style={{ color: p.color }}>
-            {p.name}: {p.value} mm
-          </p>
-        ))}
+      <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-lg dark:border-[rgba(255,255,255,0.1)] dark:bg-[#1d2027]">
+        <p className="mb-1 font-semibold text-slate-700 dark:text-[#e1e2ec]">
+          {timeLabel}
+        </p>
+        <p className="text-blue-600 dark:text-[#60a5fa]">
+          Curah hujan: {rainfall.toFixed(1)} mm/jam
+        </p>
       </div>
     );
   }
@@ -84,15 +88,10 @@ export function RiskAnalysisPage() {
     lng: DEFAULT_LNG,
   });
 
-  // Tracks whether the initial sync has completed so the pathname effect
-  // skips the first mount (handled by [locationResolved, loadRiskData] effect).
-  const initialSyncDone = useRef(false);
-
   const [riskData, setRiskData] = useState<FloodRiskResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [locationLoading, setLocationLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [locationError, setLocationError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   // Real hourly forecast from Open-Meteo
@@ -103,6 +102,8 @@ export function RiskAnalysisPage() {
   const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([]);
   const [savedLocationsLoading, setSavedLocationsLoading] = useState(true);
   const [selectedSavedLocationId, setSelectedSavedLocationId] = useState("");
+  const [showLocDropdown, setShowLocDropdown] = useState(false);
+  const locDropdownRef = useRef<HTMLDivElement>(null);
   const [showProbabilityBreakdown, setShowProbabilityBreakdown] = useState(false);
 
   const [userCoords, setUserCoords] = useState({
@@ -112,6 +113,18 @@ export function RiskAnalysisPage() {
 
   // Controls whether the initial risk-data fetch is allowed to run
   const [locationResolved, setLocationResolved] = useState(false);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (locDropdownRef.current && !locDropdownRef.current.contains(e.target as Node)) {
+        setShowLocDropdown(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handler);
+
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   const updateCoords = useCallback((lat: number, lng: number) => {
     coordsRef.current = { lat, lng };
@@ -294,16 +307,11 @@ export function RiskAnalysisPage() {
 
   // Saat user pindah dari Dashboard ke Risk Analysis dalam SPA, component bisa saja
   // tidak selalu full refresh. Karena itu, sync ulang setiap route ini dibuka.
-  // initialSyncDone dipakai untuk melewati mount pertama — initial load sudah
-  // ditangani oleh effect [locationResolved, loadRiskData] di bawah.
   useEffect(() => {
     if (!locationResolved) return;
-    if (!initialSyncDone.current) {
-      initialSyncDone.current = true;
-      return;
-    }
+
     syncLocationWithDashboard(true);
-  }, [routerLocation.pathname, locationResolved, syncLocationWithDashboard]);
+  }, [routerLocation.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Jaga-jaga kalau Dashboard menyimpan session location saat tab masih sama / balik dari tab lain.
   useEffect(() => {
@@ -333,9 +341,9 @@ export function RiskAnalysisPage() {
   }, [locationResolved, loadRiskData]);
 
   const handleSavedLocationChange = useCallback(
-    async (event: ChangeEvent<HTMLSelectElement>) => {
-      const selectedId = event.target.value;
+    async (selectedId: string) => {
       setSelectedSavedLocationId(selectedId);
+      setShowLocDropdown(false);
 
       if (!selectedId) return;
 
@@ -350,6 +358,8 @@ export function RiskAnalysisPage() {
 
       setActiveLocationLabel(selectedLocation.name);
       saveSessionLocation(lat, lng);
+      saveSessionLocationName(selectedLocation.name ?? selectedLocation.address ?? 'Lokasi Tersimpan');
+      window.dispatchEvent(new Event('bansos-location-updated'));
       await loadRiskData(lat, lng);
     },
     [loadRiskData, savedLocations],
@@ -359,7 +369,6 @@ export function RiskAnalysisPage() {
   const handleUseMyLocation = useCallback(async () => {
     setLocationLoading(true);
     setError(null);
-    setLocationError(null);
 
     try {
       const location = await getCurrentUserLocation();
@@ -367,11 +376,13 @@ export function RiskAnalysisPage() {
       setSelectedSavedLocationId("");
       setActiveLocationLabel("Lokasi GPS Anda");
       saveSessionLocation(location.latitude, location.longitude);
+      saveSessionLocationName('Lokasi GPS Anda');
+      window.dispatchEvent(new Event('bansos-location-updated'));
       await loadRiskData(location.latitude, location.longitude);
     } catch (err: any) {
       console.error("Failed to get user location:", err);
 
-      setLocationError(
+      setError(
         err.message || "Gagal mengambil lokasi GPS. Menggunakan alamat utama.",
       );
 
@@ -441,54 +452,119 @@ export function RiskAnalysisPage() {
 
   const waterDelta =
     waterLevel && previousWaterLevel ? waterLevel - previousWaterLevel : 0;
+  
+  function formatWaterTrend(trend: string) {
+    const normalizedTrend = trend.toUpperCase();
+
+    if (normalizedTrend === "RISING") return "Naik";
+    if (normalizedTrend === "DECREASING") return "Menurun";
+    if (normalizedTrend === "STABLE") return "Stabil";
+
+    return "Tidak diketahui";
+  }
 
   const waterDeltaLabel =
     waterDelta > 0
-      ? `↑ +${waterDelta.toFixed(0)} cm vs sebelumnya`
+      ? `Naik +${waterDelta.toFixed(0)} cm dari 10 menit lalu`
       : waterDelta < 0
-        ? `↓ ${waterDelta.toFixed(0)} cm vs sebelumnya`
-        : "→ Stabil";
+        ? `Turun ${waterDelta.toFixed(0)} cm dari 10 menit lalu`
+        : "Tidak berubah dari 10 menit lalu";
 
   return (
-    <div className="p-4 sm:p-6 text-[#e1e2ec] space-y-4 sm:space-y-6">
+    <div className="p-6 text-[#e1e2ec] space-y-6">
       {/* Header */}
       <div className="space-y-2">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
+        <div className="flex items-center justify-between gap-2">
           <h1 className="text-[#e1e2ec] text-2xl sm:text-3xl font-semibold tracking-tight">
             Risk Analysis
           </h1>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative">
-              <select
-                value={selectedSavedLocationId}
-                onChange={handleSavedLocationChange}
-                disabled={
-                  refreshing ||
-                  loading ||
-                  locationLoading ||
-                  savedLocationsLoading
-                }
-                className="w-full sm:w-[190px] md:w-[230px] appearance-none rounded-lg bg-[rgba(16,19,26,0.6)] border border-[rgba(173,198,255,0.25)] px-3 py-1.5 sm:py-2 pr-9 text-xs sm:text-sm text-[#e1e2ec] outline-none backdrop-blur-sm hover:border-[rgba(173,198,255,0.45)] focus:border-[#adc6ff] disabled:opacity-70 disabled:cursor-not-allowed transition-colors"
-              >
-                <option value="">
-                  {savedLocationsLoading
-                    ? "Memuat saved location..."
-                    : savedLocations.length > 0
-                      ? "Pilih saved location"
-                      : "Belum ada saved location"}
-                </option>
-                {savedLocations.map((location) => (
-                  <option key={location.id} value={location.id}>
-                    {location.name}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown
-                size={14}
-                className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#adc6ff]"
-              />
-            </div>
+          <div className="flex flex-wrap items-center justify-end gap-2 shrink-0">
+            {savedLocations.length > 0 && (
+              <div className="relative" ref={locDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setShowLocDropdown((v) => !v)}
+                  disabled={refreshing || loading || locationLoading || savedLocationsLoading}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-lg border text-xs sm:text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                    selectedSavedLocationId
+                      ? "border-[#4ade80]/50 text-[#4ade80] bg-[rgba(74,222,128,0.08)]"
+                      : "border-[#adc6ff]/40 text-[#adc6ff] hover:bg-[rgba(173,198,255,0.12)]"
+                  }`}
+                >
+                  <BookMarked size={12} />
+                  {selectedSavedLocationId
+                    ? (savedLocations.find((l) => l.id === selectedSavedLocationId)?.name ?? "Lokasi Tersimpan")
+                    : "Lokasi Tersimpan"}
+                  <ChevronDown
+                    size={11}
+                    className={`transition-transform ${showLocDropdown ? "rotate-180" : ""}`}
+                  />
+                </button>
+
+                {showLocDropdown && (
+                  <div className="absolute right-0 top-full mt-1.5 z-[500] w-64 bg-[#1d2027] border border-[rgba(255,255,255,0.1)] rounded-xl shadow-2xl overflow-hidden">
+                    <p className="px-3 py-2 text-[10px] uppercase tracking-widest text-[#8c909f] border-b border-[rgba(255,255,255,0.06)]">
+                      Pilih Lokasi Pantauan
+                    </p>
+
+                    <ul className="max-h-52 overflow-y-auto">
+                      {savedLocations.map((loc) => {
+                        const hasCoords = loc.latitude != null && loc.longitude != null;
+
+                        return (
+                          <li key={loc.id}>
+                            <button
+                              type="button"
+                              onClick={() => hasCoords && handleSavedLocationChange(loc.id)}
+                              disabled={!hasCoords}
+                              className={`w-full flex items-start gap-2.5 px-3 py-2.5 text-left transition-colors border-b border-[rgba(255,255,255,0.04)] last:border-0 ${
+                                !hasCoords
+                                  ? "opacity-40 cursor-not-allowed"
+                                  : selectedSavedLocationId === loc.id
+                                    ? "bg-[rgba(74,222,128,0.08)]"
+                                    : "hover:bg-[rgba(173,198,255,0.06)]"
+                              }`}
+                            >
+                              <MapPin
+                                size={13}
+                                className={`shrink-0 mt-0.5 ${
+                                  selectedSavedLocationId === loc.id
+                                    ? "text-[#4ade80]"
+                                    : "text-[#adc6ff]"
+                                }`}
+                              />
+
+                              <div className="min-w-0">
+                                <p
+                                  className={`text-sm font-medium truncate ${
+                                    selectedSavedLocationId === loc.id
+                                      ? "text-[#4ade80]"
+                                      : "text-[#e1e2ec]"
+                                  }`}
+                                >
+                                  {loc.name}
+                                </p>
+
+                                <p className="text-[#8c909f] text-xs truncate">
+                                  {loc.address}
+                                </p>
+
+                                {!hasCoords && (
+                                  <p className="text-[#ffb786] text-[10px] mt-0.5">
+                                    Koordinat belum ada — atur ulang di Settings
+                                  </p>
+                                )}
+                              </div>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
 
             <button
               onClick={handleUseMyLocation}
@@ -521,7 +597,7 @@ export function RiskAnalysisPage() {
                 {refreshing ? "..." : "Refresh"}
               </span>
               <span className="hidden sm:inline">
-                {refreshing ? "Refreshing..." : "Refresh Analysis"}
+                {refreshing ? "Refreshing..." : "Refresh Analisis"}
               </span>
             </button>
           </div>
@@ -531,7 +607,7 @@ export function RiskAnalysisPage() {
           <p className="text-[#c2c6d6] text-sm sm:text-base">
             {loading || locationLoading
               ? "Mengambil lokasi dan memuat analisis risiko..."
-              : `Real-time monitoring for ${locationName}.`}
+              : `Real-time monitoring di ${locationName}.`}
           </p>
 
           <p className="text-[#8c909f] text-xs mt-1">
@@ -540,25 +616,6 @@ export function RiskAnalysisPage() {
           </p>
         </div>
       </div>
-
-      {/* GPS permission warning — non-blocking, data still loads from fallback */}
-      {locationError && !error && (
-        <div className="flex items-center justify-between gap-3 p-3 rounded-xl bg-[rgba(255,183,134,0.08)] border border-[rgba(255,183,134,0.25)]">
-          <div className="flex items-center gap-2">
-            <MapPin size={15} className="text-[#ffb786] shrink-0" />
-            <p className="text-[#ffb786] text-xs lg:text-sm">
-              {locationError} — Menampilkan data untuk lokasi tersimpan.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setLocationError(null)}
-            className="text-[#8c909f] hover:text-[#e1e2ec] text-xs shrink-0 transition-colors"
-          >
-            ✕
-          </button>
-        </div>
-      )}
 
       {/* Backend / Location Error Banner */}
       {error && (
@@ -600,7 +657,7 @@ export function RiskAnalysisPage() {
         <div className="bg-[#1d2027] border border-[rgba(255,255,255,0.06)] rounded-xl p-4 sm:p-5 relative overflow-hidden">
           <div className="flex items-start justify-between mb-1 gap-1">
             <p className="text-[#8c909f] text-[10px] sm:text-xs uppercase tracking-wide leading-snug">
-              Weather Risk Score
+              Skor Risiko Cuaca
             </p>
             {loading || locationLoading ? (
               <Loader2
@@ -626,8 +683,8 @@ export function RiskAnalysisPage() {
           <p className="text-[#adc6ff] text-[10px] sm:text-xs mt-2 leading-snug">
             {loading || locationLoading
               ? ""
-              : riskData
-                ? `${riskData.details.weather.rainy_slots}/${riskData.details.weather.total_slots} slot hujan terdeteksi`
+              : forecastData.length > 0
+                ? `${forecastData.filter((point) => point.rainfall > 0).length}/${forecastData.length} periode prakiraan menunjukkan hujan`
                 : ""}
           </p>
         </div>
@@ -642,17 +699,17 @@ export function RiskAnalysisPage() {
         >
           <div className="flex flex-col items-start gap-1 mb-1">
             <p className="text-[#8c909f] text-[10px] sm:text-xs uppercase tracking-wide leading-snug">
-              Water Level
+              Ketinggian di Pos Air
             </p>
 
             {!loading && !locationLoading && (
               <span
                 className={`text-[9px] sm:text-[10px] font-semibold px-1.5 py-0.5 rounded uppercase leading-none ${
                   isCriticalWater
-                    ? "bg-[#93000a] text-[#ffdad6]"
+                    ? "bg-red-200 text-red-700 border border-red-100 dark:bg-[#93000a] dark:text-[#ffdad6] dark:border-[rgba(255,180,171,0.25)]"
                     : alertStatus.includes("SIAGA 3")
-                      ? "bg-[#5c3c00] text-[#ffb786]"
-                      : "bg-[#002105] text-[#7dd878]"
+                      ? "bg-amber-200 text-amber-600 border border-amber-100 dark:bg-[#5d3c00] dark:text-[#ffb786] dark:border-[rgba(255,183,134,0.25)]"
+                      : "bg-emerald-200 text-emerald-700 border border-emerald-100 dark:bg-[#026511] dark:text-[#7df777] dark:border-[rgba(125,216,120,0.25)]"
                 }`}
               >
                 {formatAlertStatus(alertStatus)}
@@ -696,7 +753,7 @@ export function RiskAnalysisPage() {
         >
           <div className="flex items-start justify-between mb-1 gap-1">
             <p className="text-[#8c909f] text-[10px] sm:text-xs uppercase tracking-wide leading-snug">
-              Flood Probability
+              Kemungkinan Banjir
             </p>
 
             {loading || locationLoading ? (
@@ -819,7 +876,7 @@ export function RiskAnalysisPage() {
             </p>
             <p className="text-[#8c909f] text-xs mt-1">
               Jarak sekitar {waterStationDistance.toFixed(2)} km dari lokasi
-              monitoring.
+              Anda.
             </p>
           </div>
 
@@ -827,7 +884,9 @@ export function RiskAnalysisPage() {
             <p className="text-[#8c909f] text-[10px] uppercase tracking-wide">
               Tren Tinggi Air
             </p>
-            <p className="text-[#e1e2ec] font-semibold mt-1">{waterTrend}</p>
+            <p className="text-[#e1e2ec] font-bold mt-1">
+              {formatWaterTrend(waterTrend)}
+            </p>
             <p className="text-[#8c909f] text-xs mt-1">
               Berdasarkan perubahan data sensor terakhir.
             </p>
@@ -840,10 +899,10 @@ export function RiskAnalysisPage() {
         <div className="flex flex-wrap items-center justify-between gap-2 mb-5 sm:mb-6">
           <div>
             <h2 className="text-[#e1e2ec] text-base sm:text-xl font-semibold">
-              48-Hour Rainfall Forecast
+              Prakiraan Hujan - 48 Jam
             </h2>
             <p className="text-[#8c909f] text-[10px] mt-0.5">
-              Prakiraan curah hujan nyata per jam · Sumber: Open-Meteo
+              Prakiraan curah hujan per jam · Sumber: BMKG
             </p>
           </div>
 
@@ -912,7 +971,7 @@ export function RiskAnalysisPage() {
                   tickLine={false}
                   interval={7}
                   tickFormatter={(val: number) =>
-                    forecastData[val]?.label ?? ""
+                    forecastData[val]?.time ?? ""
                   }
                 />
 

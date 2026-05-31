@@ -19,10 +19,17 @@ import { VerifyReports } from './AdminVerifyReports';
 import { AdminOverview, CommunityReport, fetchAdminOverview, fetchReports, updateReportStatus } from '../services/api';
 
 const severityColor: Record<string, string> = {
-  KRITIS: 'bg-[#93000a] text-[#ffdad6]',
-  SEDANG: 'bg-[#5c3c00] text-[#ffb786]',
-  RENDAH: 'bg-[#002105] text-[#7dd878]',
-  PERINGATAN: 'bg-[#5c3c00] text-[#ffb786]',
+  KRITIS:
+    'bg-red-200/40 text-red-500 border border-red-100 dark:bg-[#93000a] dark:text-[#ffdad6] dark:border-[rgba(255,218,214,0.2)]',
+
+  SEDANG:
+    'bg-amber-200/40 text-amber-600 border border-amber-100 dark:bg-[#5c3c00] dark:text-[#ffb786] dark:border-[rgba(255,183,134,0.2)]',
+
+  RENDAH:
+    'bg-emerald-200/40 text-emerald-600 border border-emerald-100 dark:bg-[#002105] dark:text-[#7dd878] dark:border-[rgba(125,216,120,0.2)]',
+
+  PERINGATAN:
+    'bg-amber-200/40 text-amber-600 border border-amber-100 dark:bg-[#5c3c00] dark:text-[#ffb786] dark:border-[rgba(255,183,134,0.2)]',
 };
 
 function Overview() {

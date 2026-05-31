@@ -15,6 +15,7 @@ import { fetchSavedLocations } from './api';
 
 // ── Constants ─────────────────────────────────────────────────────
 export const SESSION_LOCATION_KEY = 'bansos_user_location';
+export const SESSION_LOCATION_NAME_KEY = 'bansos_active_location_name';
 
 /** Fallback centre — Kemang, Jakarta Selatan */
 export const DEFAULT_LAT = -6.1233;
@@ -46,6 +47,22 @@ export function saveSessionLocation(lat: number, lng: number): void {
     sessionStorage.setItem(SESSION_LOCATION_KEY, JSON.stringify({ lat, lng }));
   } catch {
     // sessionStorage unavailable (private browsing, storage full, etc.)
+  }
+}
+
+/** Persist the human-readable name of the currently active location. */
+export function saveSessionLocationName(name: string): void {
+  try {
+    sessionStorage.setItem(SESSION_LOCATION_NAME_KEY, name);
+  } catch { /* sessionStorage unavailable */ }
+}
+
+/** Read the name of the currently active location from sessionStorage. */
+export function getSessionLocationName(): string | null {
+  try {
+    return sessionStorage.getItem(SESSION_LOCATION_NAME_KEY);
+  } catch {
+    return null;
   }
 }
 

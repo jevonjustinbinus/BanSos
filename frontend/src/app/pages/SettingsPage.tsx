@@ -42,7 +42,7 @@ import {
   XCircle,
   MapPinned,
 } from 'lucide-react';
-import imgMapView from '../../imports/ProfileProfessionalDarkTheme-2/95a1e6ef9cc5afd696639f1af1a49888c9223daf.png';
+import imgMapView from '../../assets/images/profile-map-view.png';
 
 interface NominatimResult {
   place_id: number;
@@ -603,14 +603,14 @@ export function SettingsPage() {
     const settingsRows = [
       {
         icon: <Bell size={20} className="text-[#94a3b8]" />,
-        title: 'Notification Preferences',
-        desc: 'Manage report status alerts and nearby report notifications.',
+        title: 'Preferensi Notifikasi',
+        desc: 'Kelola notifikasi yang masuk ke akun Anda.',
         action: openNotificationModal,
       },
       {
         icon: <Shield size={20} className="text-[#94a3b8]" />,
-        title: 'Privacy & Security',
-        desc: 'Reset your account password directly from settings.',
+        title: 'Privasi & Keamanan',
+        desc: 'Reset password akun anda.',
         action: openSecurityModal,
       },
     ];
@@ -655,7 +655,7 @@ export function SettingsPage() {
               <div className="flex-1 min-w-0 space-y-3">
                 <div>
                   <label className="block text-[#8c909f] text-xs uppercase tracking-widest font-medium mb-1.5">
-                    Display Name
+                    Nama
                   </label>
 
                   <input
@@ -686,7 +686,7 @@ export function SettingsPage() {
                   
                 <div className="flex flex-wrap items-center gap-2">
                   <span
-                    className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold"
+                    className="mt-1 flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold"
                     style={{
                       backgroundColor: theme === 'dark' ? 'rgba(52, 211, 153, 0.12)' : '#dcfce7',
                       border:
@@ -697,11 +697,11 @@ export function SettingsPage() {
                     }}
                   >
                     <CheckCircle2 size={12} />
-                    Verified Responder
+                    Terverifikasi
                   </span>
 
                   <span
-                    className="rounded-full px-3 py-1 text-xs font-semibold"
+                    className="mt-1 rounded-full px-3 py-1 text-xs font-semibold"
                     style={{
                       backgroundColor: theme === 'dark' ? 'rgba(173, 198, 255, 0.12)' : '#dbeafe',
                       border:
@@ -711,7 +711,7 @@ export function SettingsPage() {
                       color: theme === 'dark' ? '#adc6ff' : '#0f2f6f',
                     }}
                   >
-                    {joinedYear ? `Joined ${joinedYear}` : '...'}
+                    {joinedYear ? `Bergabung tahun ${joinedYear}` : '...'}
                   </span>
                 </div>
 
@@ -750,24 +750,26 @@ export function SettingsPage() {
                   </div>
                 )}
 
-                <button
-                  type="button"
-                  onClick={handleSaveProfile}
-                  disabled={profileSaving}
-                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-[#adc6ff] hover:bg-[#c7d9ff] disabled:opacity-50 disabled:cursor-not-allowed text-[#002e6a] text-sm font-semibold transition-colors"
-                >
-                  {profileSaving ? (
-                    <>
-                      <Loader2 size={15} className="animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save size={15} />
-                      Save Profile
-                    </>
-                  )}
-                </button>
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleSaveProfile}
+                    disabled={profileSaving}
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-[#adc6ff] hover:bg-[#c7d9ff] disabled:opacity-50 disabled:cursor-not-allowed text-[#002e6a] text-sm font-semibold transition-colors"
+                  >
+                    {profileSaving ? (
+                      <>
+                        <Loader2 size={15} className="animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save size={15} />
+                        Simpan Profil
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -779,7 +781,7 @@ export function SettingsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[#e1e2ec] text-xs uppercase tracking-widest font-medium">Laporan Sekitar</p>
-                <p className="text-[#003d9b] text-2xl font-semibold mt-1">
+                <p className="mt-2 text-[#003d9b] text-5xl font-semibold">
                   {totalReports === null ? '...' : totalReports}
                 </p>
               </div>
@@ -792,7 +794,7 @@ export function SettingsPage() {
               className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-[#e1e2ec] hover:bg-[#c5c8d6] text-[#191b23] text-sm font-semibold transition-colors"
             >
               <FileText size={14} />
-              View Reports
+              Lihat Laporan
             </button>
           </div>
         </div>
@@ -802,16 +804,16 @@ export function SettingsPage() {
       <div>
         <div className="flex items-start justify-between mb-3">
           <div>
-            <h3 className="text-[#e1e2ec] text-xl lg:text-2xl font-semibold">Saved Locations</h3>
-            <p className="text-[#e1e2ec] text-sm mt-0.5 opacity-70">Manage areas you are currently monitoring for alerts.</p>
+            <h3 className="text-[#e1e2ec] text-xl lg:text-2xl font-semibold">Lokasi</h3>
+            <p className="text-[#e1e2ec] text-sm mt-0.5 opacity-70">Kelola lokasi yang ingin Anda pantau.</p>
           </div>
           <button
             onClick={openAddModal}
-            className="flex items-center gap-1.5 px-3 lg:px-4 py-2 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-white text-sm font-medium transition-colors shrink-0 ml-3"
+            className="flex items-center gap-1.5 px-3 lg:px-4 py-2 rounded-lg bg-blue-600 text-zinc-50 hover:bg-blue-700 dark:bg-[#2850d2] dark:text-[#dae4fb] dark:hover:bg-[#2f55d4] text-sm font-semibold transition-colors shrink-0 ml-3"
           >
             <Plus size={14} />
-            <span className="hidden sm:inline">Add Location</span>
-            <span className="sm:hidden">Add</span>
+            <span className="hidden sm:inline">Tambah Lokasi</span>
+            <span className="sm:hidden">Tambah</span>
           </button>
         </div>
 
@@ -841,8 +843,8 @@ export function SettingsPage() {
                 </div>
                 {/* Radius badge */}
                 <div className="absolute bottom-2 left-3">
-                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-black/60 text-[#adc6ff]">
-                    {loc.radius} km radius
+                  <span className="text-[12px] font-medium px-2 py-0.5 rounded-full bg-black/60 text-[#ffffff]">
+                   Radius {loc.radius} km
                   </span>
                 </div>
               </div>
@@ -872,7 +874,7 @@ export function SettingsPage() {
                     onClick={() => navigate('/dashboard/map')}
                     className="flex-1 py-1.5 rounded-lg border border-[rgba(255,255,255,0.15)] text-[#e1e2ec] text-xs font-medium hover:bg-[rgba(255,255,255,0.05)] transition-colors"
                   >
-                    View Map
+                    Lihat Map
                   </button>
                 </div>
               </div>
@@ -889,8 +891,8 @@ export function SettingsPage() {
                 <Plus size={18} className="text-[#94a3b8]" />
               </div>
               <div className="text-center">
-                <p className="text-[#e1e2ec] text-sm font-medium">Add New Location</p>
-                <p className="text-[#8c909f] text-xs mt-0.5">Monitor a new area</p>
+                <p className="text-[#e1e2ec] text-sm font-medium">Pilih lokasi baru</p>
+                <p className="text-[#8c909f] text-xs mt-0.5">Pantau area lain</p>
               </div>
             </button>
           )}
@@ -936,7 +938,7 @@ export function SettingsPage() {
               <div className="flex items-center gap-2">
                 <Bell size={16} className="text-blue-600 dark:text-[#adc6ff]" />
                 <h3 className="font-semibold text-slate-900 dark:text-[#e1e2ec]">
-                  Notification Preferences
+                  Preferensi Notifikasi
                 </h3>
               </div>
 
@@ -953,10 +955,10 @@ export function SettingsPage() {
             <div className="space-y-3 px-5 py-5">
               <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 dark:border-[rgba(173,198,255,0.16)] dark:bg-[rgba(173,198,255,0.06)]">
                 <p className="text-sm font-semibold text-slate-900 dark:text-[#e1e2ec]">
-                  Manage what alerts you want to receive
+                  Pilih jenis peringatan apa yang Anda ingin dapatkan.
                 </p>
                 <p className="mt-1 text-xs leading-relaxed text-slate-600 dark:text-[#8c909f]">
-                  Aktifkan atau matikan jenis notifikasi sesuai kebutuhan kamu.
+                  Aktifkan atau matikan jenis notifikasi sesuai kebutuhan Anda.
                 </p>
                 <p className="mt-2 text-xs leading-relaxed text-slate-500 dark:text-[#8c909f]">
                   Flood risk alert tetap aktif sebagai peringatan keselamatan utama dan tidak dapat dimatikan.
@@ -1036,7 +1038,7 @@ export function SettingsPage() {
                 disabled={notificationSaving}
                 className="flex-1 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 disabled:opacity-50 dark:border-[rgba(255,255,255,0.12)] dark:text-[#e1e2ec] dark:hover:bg-[rgba(255,255,255,0.05)]"
               >
-                Cancel
+                Batal
               </button>
 
               <button
@@ -1050,7 +1052,7 @@ export function SettingsPage() {
                     Saving...
                   </>
                 ) : (
-                  'Save Preferences'
+                  'Simpan Pengaturan'
                 )}
               </button>
             </div>
@@ -1162,7 +1164,7 @@ export function SettingsPage() {
                 disabled={passwordLoading}
                 className="flex-1 py-2.5 rounded-lg border border-[rgba(255,255,255,0.12)] text-[#e1e2ec] text-sm font-medium hover:bg-[rgba(255,255,255,0.05)] transition-colors disabled:opacity-50"
               >
-                Cancel
+                Batal
               </button>
 
               <button
@@ -1192,7 +1194,7 @@ export function SettingsPage() {
             <div className="flex items-center justify-between px-5 py-4 border-b border-[rgba(255,255,255,0.07)]">
               <div className="flex items-center gap-2">
                 <MapPin size={16} className="text-[#adc6ff]" />
-                <h3 className="text-[#e1e2ec] font-semibold">Add New Location</h3>
+                <h3 className="text-[#e1e2ec] font-semibold">Pilih Lokasi Baru</h3>
               </div>
               <button onClick={() => setShowAddModal(false)} className="text-[#8c909f] hover:text-[#e1e2ec] transition-colors">
                 <X size={18} />
@@ -1203,10 +1205,10 @@ export function SettingsPage() {
             <div className="px-5 py-5 space-y-4">
               {/* Name */}
               <div>
-                <label className="block text-[#8c909f] text-xs font-medium mb-1.5 uppercase tracking-wide">Location Name</label>
+                <label className="block text-[#8c909f] text-xs font-medium mb-1.5 uppercase tracking-wide">Nama Lokasi</label>
                 <input
                   type="text"
-                  placeholder="e.g. Home, Office, School..."
+                  placeholder="e.g. Rumah, Kantor, Gym..."
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] rounded-lg px-4 py-2.5 text-[#e1e2ec] text-sm placeholder-[#8c909f] focus:outline-none focus:border-[rgba(173,198,255,0.4)] transition-colors"
@@ -1215,7 +1217,7 @@ export function SettingsPage() {
 
               {/* Address */}
               <div className="relative" ref={suggestionBoxRef}>
-                <label className="block text-[#8c909f] text-xs font-medium mb-1.5 uppercase tracking-wide">Address</label>
+                <label className="block text-[#8c909f] text-xs font-medium mb-1.5 uppercase tracking-wide">Alamat</label>
                 <div className="relative">
                   <input
                     type="text"
@@ -1278,7 +1280,7 @@ export function SettingsPage() {
               {/* Monitoring Radius */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-[#8c909f] text-xs font-medium uppercase tracking-wide">Monitoring Radius</label>
+                  <label className="text-[#8c909f] text-xs font-medium uppercase tracking-wide">Radius Pantauan</label>
                   <span className="text-[#adc6ff] text-sm font-semibold">{newRadius} km</span>
                 </div>
                 <input
@@ -1298,7 +1300,7 @@ export function SettingsPage() {
 
               {/* Status */}
               <div>
-                <label className="block text-[#8c909f] text-xs font-medium mb-1.5 uppercase tracking-wide">Initial Status</label>
+                <label className="block text-[#8c909f] text-xs font-medium mb-1.5 uppercase tracking-wide">Status</label>
                 <div className="flex gap-2">
                   {(['clear', 'alert'] as const).map((s) => (
                     <button
@@ -1331,14 +1333,14 @@ export function SettingsPage() {
                 onClick={() => { setShowAddModal(false); setLocationError(''); }}
                 className="flex-1 py-2.5 rounded-lg border border-[rgba(255,255,255,0.12)] text-[#e1e2ec] text-sm font-medium hover:bg-[rgba(255,255,255,0.05)] transition-colors"
               >
-                Cancel
+                Batal
               </button>
               <button
                 onClick={handleAddLocation}
                 disabled={!newName.trim() || !newAddress.trim() || addingLocation}
                 className="flex-1 py-2.5 rounded-lg bg-[#adc6ff] hover:bg-[#c7d9ff] text-[#002e6a] text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                {addingLocation ? 'Menyimpan...' : 'Add Location'}
+                {addingLocation ? 'Menyimpan...' : 'Simpan Lokasi'}
               </button>
             </div>
           </div>
@@ -1420,14 +1422,14 @@ export function SettingsPage() {
                 onClick={() => setEditingLocation(null)}
                 className="flex-1 py-2.5 rounded-lg border border-[rgba(255,255,255,0.12)] text-[#e1e2ec] text-sm font-medium hover:bg-[rgba(255,255,255,0.05)] transition-colors"
               >
-                Cancel
+                Batal
               </button>
               <button
                 onClick={handleSaveRadius}
                 disabled={savingRadius}
                 className="flex-1 py-2.5 rounded-lg bg-[#adc6ff] hover:bg-[#c7d9ff] text-[#002e6a] text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                {savingRadius ? 'Menyimpan...' : 'Save Radius'}
+                {savingRadius ? 'Menyimpan...' : 'Simpan Radius'}
               </button>
             </div>
           </div>

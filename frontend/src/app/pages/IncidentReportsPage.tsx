@@ -16,28 +16,26 @@ import { supabase } from '../services/supabaseClient';
 import { FilterSheet, DEFAULT_FILTERS, countActiveFilters } from '../components/FilterSheet';
 import type { FilterState } from '../components/FilterSheet';
 import { getCurrentUserLocation } from '../services/location';
-import imgFloodDisaster from '../../imports/IncidentReportsProfessionalDarkTheme-1-1/29b25b748125cb7259bcf974fb07992b480291cc.png';
+import imgFloodDisaster from '../../assets/images/flood-disaster.png';
 
 const severityStyle: Record<string, string> = {
-  KRITIS: 'bg-[#93000a] text-[#ffdad6]',
-  SEDANG: 'bg-[#5c3c00] text-[#ffb786]',
-  RENDAH: 'bg-[#002105] text-[#7dd878]',
+  KRITIS:
+    'bg-red-200/40 text-red-500 border border-red-100 dark:bg-[#93000a] dark:text-[#ffdad6] dark:border-[rgba(255,218,214,0.2)]',
+
+  SEDANG:
+    'bg-amber-200/40 text-amber-600 border border-amber-100 dark:bg-[#5c3c00] dark:text-[#ffb786] dark:border-[rgba(255,183,134,0.2)]',
+
+  RENDAH:
+    'bg-emerald-200/40 text-emerald-600 border border-emerald-100 dark:bg-[#002105] dark:text-[#7dd878] dark:border-[rgba(125,216,120,0.2)]',
 };
 
 const categoryStyle: Record<string, string> = {
-  BANJIR: 'bg-[#1d2a44] text-[var(--accent)] border border-[rgba(173,198,255,0.2)]',
-  'POHON TUMBANG': 'bg-[#2a2320] text-[#ffb786] border border-[rgba(255,183,134,0.2)]',
-  INFRASTRUKTUR: 'bg-[#2a2320] text-[#ffb786] border border-[rgba(255,183,134,0.2)]',
-  GENANGAN: 'bg-[#1a2a1a] text-[#7dd878] border border-[rgba(125,216,120,0.2)]',
-  KECELAKAAN: 'bg-[#2a1d2a] text-[#d0a0ff] border border-[rgba(208,160,255,0.2)]',
-  KEBAKARAN: 'bg-[#2a1a1a] text-[#ff8a65] border border-[rgba(255,138,101,0.2)]',
+  BANJIR:
+    'bg-blue-200 text-blue-700 border border-blue-100 dark:bg-[#2444AB] dark:text-[#adc6ff] dark:border-[rgba(173,198,255,0.2)]',
 };
 
 const CHIP_LABEL: Record<string, string> = {
   BANJIR: 'Banjir',
-  'POHON TUMBANG': 'Pohon Tumbang',
-  KECELAKAAN: 'Kecelakaan',
-  KEBAKARAN: 'Kebakaran',
   KRITIS: 'Kritis',
   SEDANG: 'Sedang',
   RENDAH: 'Aman',
@@ -120,7 +118,7 @@ function formatTimeAgo(createdAt?: string): string {
   return `${Math.floor(hours / 24)} hari lalu`;
 }
 
-function getFirstMedia(report: CommunityReport): { url: string; isVideo: boolean } | null {
+function getFirstImage(report: CommunityReport): string | null {
   const anyReport = report as any;
 
   const media =
@@ -137,29 +135,45 @@ function getFirstMedia(report: CommunityReport): { url: string; isVideo: boolean
     return type.includes('image') || type === 'photo';
   });
 
-  const video = !image
-    ? media.find((item: any) => {
-        const type = String(item.media_type ?? item.type ?? item.mime_type ?? '').toLowerCase();
-        return type.includes('video');
-      })
-    : null;
+  if (!image) return null;
 
-  const selected = image ?? video ?? media[0];
-  const isVideo = !image && !!video;
-
-  const url =
-    selected?.media_url ??
-    selected?.url ??
-    selected?.file_url ??
-    selected?.public_url ??
-    selected?.path ??
-    null;
-
-  return url ? { url, isVideo } : null;
+  return (
+    image?.media_url ??
+    image?.url ??
+    image?.file_url ??
+    image?.public_url ??
+    image?.path ??
+    null
+  );
 }
 
-function getFirstImage(report: CommunityReport): string | null {
-  return getFirstMedia(report)?.url ?? null;
+function getFirstVideo(report: CommunityReport): string | null {
+  const anyReport = report as any;
+
+  const media =
+    anyReport.report_media ??
+    anyReport.media ??
+    anyReport.reportMedia ??
+    anyReport.attachments ??
+    [];
+
+  if (!Array.isArray(media) || media.length === 0) return null;
+
+  const video = media.find((item: any) => {
+    const type = String(item.media_type ?? item.type ?? item.mime_type ?? '').toLowerCase();
+    return type.includes('video');
+  });
+
+  if (!video) return null;
+
+  return (
+    video?.media_url ??
+    video?.url ??
+    video?.file_url ??
+    video?.public_url ??
+    video?.path ??
+    null
+  );
 }
 
 function getReportCoordinates(report: CommunityReport): UserCoords | null {
@@ -626,7 +640,7 @@ export function IncidentReportsPage() {
             >
               <Plus size={13} />
 
-              <span className="hidden sm:inline">Report</span>
+              <span className="hidden sm:inline">Lapor</span>
             </button>
           </div>
         </div>
@@ -748,9 +762,8 @@ export function IncidentReportsPage() {
           {filteredReports.map((report) => {
             const isApproved = report.status === 'approved';
             const isPending = report.status === 'pending';
-            const firstMedia = getFirstMedia(report);
-            const firstImage = firstMedia?.isVideo ? null : firstMedia?.url ?? null;
-            const firstVideo = firstMedia?.isVideo ? firstMedia.url : null;
+            const firstImage = getFirstImage(report);
+            const firstVideo = firstImage ? null : getFirstVideo(report);
             const reportCoords = getReportCoordinates(report);
             const confidence = isApproved ? 100 : Number(report.confidence_score ?? 0);
             const totalVotes = report.total_votes ?? 0;
@@ -816,23 +829,28 @@ export function IncidentReportsPage() {
                   </p>
 
                   <div className="mt-3 h-24 lg:h-28 rounded-lg overflow-hidden bg-[var(--bg-soft)]">
-                    {firstVideo ? (
-                      <video
-                        src={firstVideo}
-                        className="w-full h-full object-cover"
-                        preload="metadata"
-                        muted
-                        playsInline
-                      />
-                    ) : (
+                    {firstImage ? (
                       <img
-                        src={firstImage ?? imgFloodDisaster}
+                        src={firstImage}
                         alt={report.title}
-                        className={`w-full h-full object-cover ${firstImage ? '' : 'opacity-60'}`}
+                        className="w-full h-full object-cover"
                         onError={(event) => {
                           event.currentTarget.src = imgFloodDisaster;
                           event.currentTarget.classList.add('opacity-60');
                         }}
+                      />
+                    ) : firstVideo ? (
+                      <video
+                        src={firstVideo}
+                        className="w-full h-full object-cover"
+                        muted
+                        preload="metadata"
+                      />
+                    ) : (
+                      <img
+                        src={imgFloodDisaster}
+                        alt={report.title}
+                        className="w-full h-full object-cover opacity-60"
                       />
                     )}
                   </div>
